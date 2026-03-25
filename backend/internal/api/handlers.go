@@ -195,7 +195,42 @@ func (h *Handlers) ParseSchema(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]interface{}{"fields": fields})
 }
 
-// GroovyStatus reports whether Groovy is available and its version.
+// GroovyExecute executes an arbitrary Groovy script with the provided input data.
+// Request: {"script": "...", "input": <any JSON>}
+// Response: {"success": true/false, "result": <any>, "error": "...", "durationMs": 0}
+func (h *Handlers) GroovyExecute(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Script string      `json:"script"`
+		Input  interface{} `json:"input"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
+		return
+	}
+	if body.Script == "" {
+		writeError(w, http.StatusBadRequest, "script must not be empty")
+		return
+	}
+
+	start := time.Now()
+	result, err := h.groovyBridge.EvaluateScript(body.Script, body.Input)
+	duration := time.Since(start).Milliseconds()
+
+	if err != nil {
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"success":    false,
+			"error":      err.Error(),
+			"durationMs": duration,
+		})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"success":    true,
+		"result":     result,
+		"durationMs": duration,
+	})
+}
+
 func (h *Handlers) GroovyStatus(w http.ResponseWriter, r *http.Request) {
 	resp := map[string]interface{}{
 		"available": h.groovyBridge.Available,

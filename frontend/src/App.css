@@ -253,6 +253,12 @@ body {
   padding: 16px;
 }
 
+/* Script tab fills the full height without extra padding */
+.tab-content.script-tab {
+  padding: 0;
+  overflow: hidden;
+}
+
 /* ===== Mapping Tab ===== */
 .mapping-tab {
   display: flex;
@@ -555,3 +561,145 @@ body {
 
 /* ===== Misc ===== */
 .loading { padding: 20px; color: var(--color-text-muted); font-style: italic; }
+
+/* ===== Demo button in sidebar ===== */
+.mapping-demo-btn {
+  margin-top: 6px;
+  font-size: 12px;
+}
+
+/* ===== Groovy Script Tab ===== */
+.script-tab {
+  display: flex;
+  height: 100%;
+  overflow: hidden;
+  padding: 0;
+  gap: 0;
+}
+
+.script-left {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 2px solid var(--color-border);
+  overflow: hidden;
+  padding: 0 12px 12px 12px;
+}
+
+.script-right {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.script-right-top {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  border-bottom: 2px solid var(--color-border);
+  overflow: hidden;
+  padding: 12px;
+}
+
+.script-right-bottom {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 12px;
+}
+
+.script-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  padding-top: 12px;
+  flex-shrink: 0;
+}
+
+/* Make the JsonEditor fill available height in the input region */
+.script-right-top .json-editor { flex: 1; display: flex; flex-direction: column; }
+.script-right-top .json-editor-textarea { flex: 1; resize: none; }
+
+.groovy-editor {
+  flex: 1;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  font-family: 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  background: #1e2333;
+  color: #e2e8f0;
+  caret-color: #93c5fd;
+  resize: none;
+  outline: none;
+  tab-size: 2;
+  overflow: auto;
+  box-sizing: border-box;
+}
+
+.groovy-editor:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(59,130,246,0.25);
+}
+
+.script-output {
+  flex: 1;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: #f0fdf4;
+  color: #166534;
+  padding: 12px;
+  font-family: 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 12px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.script-output-placeholder {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius);
+  color: var(--color-text-muted);
+  font-style: italic;
+  font-size: 13px;
+  padding: 20px;
+  text-align: center;
+}
+
+.script-error-box {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid #fca5a5;
+  border-radius: var(--radius);
+  background: #fef2f2;
+  padding: 12px;
+  overflow: auto;
+}
+
+.script-error-label {
+  font-weight: 600;
+  color: var(--color-danger);
+  font-size: 12px;
+}
+
+.script-error-msg {
+  font-family: monospace;
+  font-size: 12px;
+  color: var(--color-danger);
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+}

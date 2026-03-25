@@ -1,11 +1,11 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { api } from '../api';
 import type { Mapping, MappingRule, SchemaField, TransformResult, ValidationResult } from '../types';
 import { JsonEditor } from './JsonEditor';
 import { SchemaTree } from './SchemaTree';
 import { RuleRow } from './RuleRow';
 
-type Tab = 'mapping' | 'rules' | 'preview';
+type Tab = 'script' | 'mapping' | 'rules' | 'preview';
 
 interface MappingEditorProps {
   mapping: Mapping;
@@ -18,17 +18,31 @@ function generateId(): string {
 
 export function MappingEditor({ mapping, onSave }: MappingEditorProps) {
   const [draft, setDraft] = useState<Mapping>(mapping);
-  const [activeTab, setActiveTab] = useState<Tab>('mapping');
+  const [activeTab, setActiveTab] = useState<Tab>('script');
 
-  const [sourceJson, setSourceJson] = useState('');
-  const [targetJson, setTargetJson] = useState('');
+  const [sourceJson, setSourceJson] = useState(
+    mapping.sourceSchema ? JSON.stringify(mapping.sourceSchema, null, 2) : ''
+  );
+  const [targetJson, setTargetJson] = useState(
+    mapping.targetSchema ? JSON.stringify(mapping.targetSchema, null, 2) : ''
+  );
   const [sourceFields, setSourceFields] = useState<SchemaField[]>([]);
   const [targetFields, setTargetFields] = useState<SchemaField[]>([]);
   const [selectedSource, setSelectedSource] = useState<SchemaField | null>(null);
   const [selectedTarget, setSelectedTarget] = useState<SchemaField | null>(null);
 
-  const [inputJson, setInputJson] = useState('{}');
+  const [inputJson, setInputJson] = useState(
+    mapping.sourceSchema ? JSON.stringify(mapping.sourceSchema, null, 2) : '{}'
+  );
   const [transformResult, setTransformResult] = useState<TransformResult | null>(null);
+
+  // Groovy Script tab state
+  const [groovyScript, setGroovyScript] = useState((mapping as any).groovyScript ?? '');
+  const [scriptInputJson, setScriptInputJson] = useState(
+    mapping.sourceSchema ? JSON.stringify(mapping.sourceSchema, null, 2) : '{}'
+  );
+  const [scriptResult, setScriptResult] = useState<{ success: boolean; result?: any; error?: string; durationMs: number } | null>(null);
+  const [scriptRunning, setScriptRunning] = useState(false);
 
   const [validation, setValidation] = useState<ValidationResult | null>(null);
   const [saving, setSaving] = useState(false);
@@ -40,13 +54,17 @@ export function MappingEditor({ mapping, onSave }: MappingEditorProps) {
   if (mapping.id !== lastMappingId) {
     setLastMappingId(mapping.id);
     setDraft(mapping);
-    setSourceJson('');
-    setTargetJson('');
+    setSourceJson(mapping.sourceSchema ? JSON.stringify(mapping.sourceSchema, null, 2) : '');
+    setTargetJson(mapping.targetSchema ? JSON.stringify(mapping.targetSchema, null, 2) : '');
     setSourceFields([]);
     setTargetFields([]);
     setSelectedSource(null);
     setSelectedTarget(null);
+    setInputJson(mapping.sourceSchema ? JSON.stringify(mapping.sourceSchema, null, 2) : '{}');
     setTransformResult(null);
+    setGroovyScript((mapping as any).groovyScript ?? '');
+    setScriptInputJson(mapping.sourceSchema ? JSON.stringify(mapping.sourceSchema, null, 2) : '{}');
+    setScriptResult(null);
     setValidation(null);
     setError(null);
     setParseError({});
@@ -75,6 +93,40 @@ export function MappingEditor({ mapping, onSave }: MappingEditorProps) {
       setParseError((e) => ({ ...e, target: err.message }));
     }
   }, [targetJson]);
+
+  // Auto-parse schemas when a mapping is loaded with pre-populated schemas.
+  // We depend on id+schemas so re-parsing fires if schemas are updated on the same mapping.
+  useEffect(() => {
+    async function autoParse() {
+      if (mapping.sourceSchema) {
+        try {
+          const result = await api.parseSchema(mapping.sourceSchema);
+          setSourceFields(result.fields);
+        } catch { /* ignore — user can click Parse Schema manually */ }
+      }
+      if (mapping.targetSchema) {
+        try {
+          const result = await api.parseSchema(mapping.targetSchema);
+          setTargetFields(result.fields);
+        } catch { /* ignore */ }
+      }
+    }
+    autoParse();
+  }, [mapping.id, mapping.sourceSchema, mapping.targetSchema]);
+
+  async function handleRunScript() {
+    setScriptRunning(true);
+    setScriptResult(null);
+    try {
+      const input = JSON.parse(scriptInputJson);
+      const result = await api.groovyExecute(groovyScript, input);
+      setScriptResult(result);
+    } catch (err: any) {
+      setScriptResult({ success: false, error: err.message, durationMs: 0 });
+    } finally {
+      setScriptRunning(false);
+    }
+  }
 
   function handleSourceSelect(field: SchemaField) {
     setSelectedSource(field);
@@ -200,16 +252,83 @@ export function MappingEditor({ mapping, onSave }: MappingEditorProps) {
 
       {/* Tabs */}
       <div className="tabs">
-        {(['mapping', 'rules', 'preview'] as Tab[]).map((tab) => (
+        {(['script', 'mapping', 'rules', 'preview'] as Tab[]).map((tab) => (
           <button
             key={tab}
             className={`tab-btn${activeTab === tab ? ' tab-btn-active' : ''}`}
             onClick={() => setActiveTab(tab)}
           >
-            {tab.charAt(0).toUpperCase() + tab.slice(1)}
+            {tab === 'script' ? 'Groovy Script' : tab.charAt(0).toUpperCase() + tab.slice(1)}
           </button>
         ))}
       </div>
+
+      {/* ─── Groovy Script Tab ─────────────────────────────────────────── */}
+      {activeTab === 'script' && (
+        <div className="tab-content script-tab">
+          {/* LEFT: Groovy editor */}
+          <div className="script-left">
+            <div className="script-panel-header">
+              <span className="panel-title">Groovy Script — Target Structure</span>
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={handleRunScript}
+                disabled={scriptRunning || !groovyScript.trim()}
+              >
+                {scriptRunning ? '⏳ Running…' : '▶ Execute'}
+              </button>
+            </div>
+            <textarea
+              className="groovy-editor"
+              value={groovyScript}
+              onChange={(e) => setGroovyScript(e.target.value)}
+              spellCheck={false}
+              placeholder={`// Write a Groovy script that transforms input into the target format.\n// The 'input' binding contains the full source JSON.\n\nreturn [\n  targetField: input.sourceField\n]`}
+            />
+          </div>
+
+          {/* RIGHT: input structure (top) + output (bottom) */}
+          <div className="script-right">
+            <div className="script-right-top">
+              <div className="script-panel-header">
+                <span className="panel-title">Input Data Structure</span>
+              </div>
+              <JsonEditor
+                label=""
+                value={scriptInputJson}
+                onChange={setScriptInputJson}
+              />
+            </div>
+
+            <div className="script-right-bottom">
+              <div className="script-panel-header">
+                <span className="panel-title">Resulting Target Format (IDoc)</span>
+                {scriptResult && (
+                  <span className={scriptResult.success ? 'meta-ok' : 'meta-error'}>
+                    {scriptResult.success ? `✔ ${scriptResult.durationMs}ms` : `✖ Error`}
+                  </span>
+                )}
+              </div>
+              {scriptResult ? (
+                scriptResult.success ? (
+                  <pre className="script-output">
+                    {JSON.stringify(scriptResult.result, null, 2)}
+                  </pre>
+                ) : (
+                  <div className="script-error-box">
+                    <div className="script-error-label">Execution error</div>
+                    <pre className="script-error-msg">{scriptResult.error}</pre>
+                  </div>
+                )
+              ) : (
+                <div className="script-output-placeholder">
+                  Press ▶ Execute to see the transformed IDoc output here.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Mapping Tab */}
       {activeTab === 'mapping' && (

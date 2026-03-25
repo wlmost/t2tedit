@@ -61,4 +61,10 @@ export const api = {
 
   groovyStatus: (): Promise<{ available: boolean; version?: string }> =>
     request<{ available: boolean; version?: string }>('/api/groovy/status'),
+
+  groovyExecute: (script: string, input: any): Promise<{ success: boolean; result?: any; error?: string; durationMs: number }> =>
+    request<{ success: boolean; result?: any; error?: string; durationMs: number }>('/api/groovy/execute', {
+      method: 'POST',
+      body: JSON.stringify({ script, input }),
+    }),
 };

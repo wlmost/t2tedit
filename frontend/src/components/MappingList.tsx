@@ -5,14 +5,18 @@ interface MappingListProps {
   selectedId?: string;
   onSelect: (id: string) => void;
   onCreate: () => void;
+  onLoadDemo: () => void;
   onDelete: (id: string) => void;
 }
 
-export function MappingList({ mappings, selectedId, onSelect, onCreate, onDelete }: MappingListProps) {
+export function MappingList({ mappings, selectedId, onSelect, onCreate, onLoadDemo, onDelete }: MappingListProps) {
   return (
     <div className="mapping-list">
       <div className="mapping-list-header">
         <button className="btn btn-primary btn-full" onClick={onCreate}>+ New Mapping</button>
+        <button className="btn btn-secondary btn-full mapping-demo-btn" onClick={onLoadDemo} title="Load SA660 → IDoc DELVRY03 demo">
+          ▶ Load SA660 → IDoc Demo
+        </button>
       </div>
       {mappings.length === 0 ? (
         <div className="mapping-list-empty">No mappings yet</div>

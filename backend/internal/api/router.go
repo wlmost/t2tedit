@@ -30,6 +30,7 @@ func NewRouter() http.Handler {
 	r.HandleFunc("/api/transform", h.ExecuteTransform).Methods(http.MethodPost)
 	r.HandleFunc("/api/validate", h.ValidateMapping).Methods(http.MethodPost)
 	r.HandleFunc("/api/parse-schema", h.ParseSchema).Methods(http.MethodPost)
+	r.HandleFunc("/api/groovy/execute", h.GroovyExecute).Methods(http.MethodPost)
 	r.HandleFunc("/api/groovy/status", h.GroovyStatus).Methods(http.MethodGet)
 
 	allowedOrigins := []string{"*"}

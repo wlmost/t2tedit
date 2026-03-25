@@ -3,6 +3,14 @@ import { api } from './api';
 import type { Mapping } from './types';
 import { MappingList } from './components/MappingList';
 import { MappingEditor } from './components/MappingEditor';
+import {
+  SA660_SOURCE,
+  IDOC_DC40_TARGET,
+  DEMO_MAPPING_NAME,
+  DEMO_MAPPING_DESCRIPTION,
+  DEMO_RULES,
+  DEMO_GROOVY_SCRIPT,
+} from './sampleData';
 import './App.css';
 
 function newBlankMapping(): Mapping {
@@ -37,6 +45,23 @@ function App() {
   function handleCreate() {
     const blank = newBlankMapping();
     setMappings((prev) => [blank, ...prev]);
+    setSelectedId('');
+  }
+
+  function handleLoadDemo() {
+    const demo = {
+      id: '',
+      name: DEMO_MAPPING_NAME,
+      description: DEMO_MAPPING_DESCRIPTION,
+      sourceSchema: SA660_SOURCE,
+      targetSchema: IDOC_DC40_TARGET,
+      rules: DEMO_RULES,
+      // groovyScript is carried as an extra field recognized by MappingEditor
+      groovyScript: DEMO_GROOVY_SCRIPT,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    } as Mapping & { groovyScript: string };
+    setMappings((prev) => [demo, ...prev.filter((m) => m.id !== '' || m.name !== DEMO_MAPPING_NAME)]);
     setSelectedId('');
   }
 
@@ -95,6 +120,7 @@ function App() {
               selectedId={selectedId}
               onSelect={handleSelect}
               onCreate={handleCreate}
+              onLoadDemo={handleLoadDemo}
               onDelete={handleDelete}
             />
           )}

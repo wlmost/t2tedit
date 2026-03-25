@@ -7,7 +7,7 @@ interface JsonEditorProps {
   height?: number;
 }
 
-export function JsonEditor({ value, onChange, label, height = 200 }: JsonEditorProps) {
+export function JsonEditor({ value, onChange, label, height }: JsonEditorProps) {
   const [error, setError] = useState<string | null>(null);
 
   function handleBlur() {
@@ -41,7 +41,7 @@ export function JsonEditor({ value, onChange, label, height = 200 }: JsonEditorP
       {label && <label className="json-editor-label">{label}</label>}
       <textarea
         className={`json-editor-textarea${error ? ' json-editor-error' : ''}`}
-        style={{ height }}
+        style={height !== undefined ? { height } : undefined}
         value={value}
         onChange={handleChange}
         onBlur={handleBlur}

@@ -54,9 +54,9 @@ export const api = {
     }),
 
   parseSchema: (data: any): Promise<{ fields: SchemaField[] }> =>
-    request<{ fields: SchemaField[] }>('/api/schema/parse', {
+    request<{ fields: SchemaField[] }>('/api/parse-schema', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify({ data }),
     }),
 
   groovyStatus: (): Promise<{ available: boolean; version?: string }> =>

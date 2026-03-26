@@ -23,6 +23,8 @@ export interface Mapping {
   sourceSchema: any;
   targetSchema: any;
   rules: MappingRule[];
+  groovyScript?: string;
+  exampleData?: unknown;
   createdAt: string;
   updatedAt: string;
 }

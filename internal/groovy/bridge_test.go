@@ -93,6 +93,54 @@ func TestGroovyBridge_Execute_InvalidScript(t *testing.T) {
 	}
 }
 
+func TestGroovyBridge_Execute_SegmentSourceForEach(t *testing.T) {
+	bridge := groovy.NewGroovyBridge()
+	if !bridge.Available {
+		t.Skip("java not available in test environment")
+	}
+
+	// Verify source.forEach(segId, closure) works for both list and single-item segments
+	script := `
+def result = [:]
+// iterate multi-item segment (List)
+def items = []
+source.forEach('661') { item ->
+    items << item.Belegnummer
+}
+result.items = items
+// single-item segment (Map, not a List)
+source.forEach('660') { item ->
+    result.header = item.Belegnummer
+}
+return result
+`
+	input := map[string]interface{}{
+		"660": map[string]interface{}{"Belegnummer": "9999"},
+		"661": []interface{}{
+			map[string]interface{}{"Belegnummer": "1234"},
+			map[string]interface{}{"Belegnummer": "5678"},
+		},
+	}
+	res, err := bridge.EvaluateScript(script, input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := res.(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected map, got %T: %v", res, res)
+	}
+	items, ok := m["items"].([]interface{})
+	if !ok {
+		t.Fatalf("expected items slice, got %T", m["items"])
+	}
+	if len(items) != 2 || items[0] != "1234" || items[1] != "5678" {
+		t.Errorf("unexpected items: %v", items)
+	}
+	if m["header"] != "9999" {
+		t.Errorf("expected header=9999, got %v", m["header"])
+	}
+}
+
 func TestGroovyBridge_Execute_TargetBuilderDSL(t *testing.T) {
 	bridge := groovy.NewGroovyBridge()
 	if !bridge.Available {

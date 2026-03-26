@@ -97,7 +97,7 @@ POST /api/transform
 
 ## Groovy / JVM Integration
 
-The backend embeds `groovy-all-2.4.21.jar` directly in the compiled binary. No separate Groovy installation is required — only a Java runtime (JRE 8 or later) needs to be available on the host system. Java is detected at startup via `exec.LookPath("java")`.
+The backend embeds `groovy-all-3.0.25.jar` directly in the compiled binary. No separate Groovy installation is required — only a Java runtime (JRE 8 or later) needs to be available on the host system. Java is detected at startup via `exec.LookPath("java")`.
 
 When a `groovy`-type rule is executed the engine:
 

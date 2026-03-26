@@ -12,7 +12,7 @@ import (
 	_ "embed"
 )
 
-//go:embed jar/groovy-all-2.4.21.jar
+//go:embed jar/groovy-all-3.0.25.jar
 var groovyAllJar []byte
 
 // GroovyBridge executes Groovy scripts via subprocess using the embedded groovy-all.jar.
@@ -35,7 +35,7 @@ func NewGroovyBridge() *GroovyBridge {
 // The extracted file lives for the process lifetime and is cleaned up by the OS on process exit.
 func (g *GroovyBridge) jarFilePath() (string, error) {
 	g.jarOnce.Do(func() {
-		f, err := os.CreateTemp("", "groovy-all-*.jar")
+		f, err := os.CreateTemp("", "groovy-all-3.0.25-*.jar")
 		if err != nil {
 			g.jarErr = fmt.Errorf("failed to create temp jar file: %w", err)
 			return

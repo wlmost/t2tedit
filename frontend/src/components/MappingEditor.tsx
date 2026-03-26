@@ -283,7 +283,7 @@ export function MappingEditor({ mapping, onSave }: MappingEditorProps) {
               value={groovyScript}
               onChange={(e) => setGroovyScript(e.target.value)}
               spellCheck={false}
-              placeholder={`// Write a Groovy script that transforms input into the target format.\n// The 'input' binding contains the full source JSON.\n\nreturn [\n  targetField: input.sourceField\n]`}
+              placeholder={`// Write a Groovy script that transforms input into the target format.\n// The 'input' binding contains the full source JSON.\n// Use the target{} builder DSL for ySE-compatible output (no array literals).\n\nreturn target {\n  targetField(input.sourceField)\n}`}
             />
           </div>
 

@@ -171,7 +171,8 @@ export const DEMO_RULES: MappingRule[] = [
 /**
  * Groovy script for the SA660 → IDoc DELVRY03 mapping.
  * The `input` binding holds the full SA660 source JSON.
- * The script returns a Groovy map that is serialised to JSON by the bridge.
+ * The script uses the target{} builder DSL (ySE-compatible) to define the target
+ * structure without array literals.
  */
 export const DEMO_GROOVY_SCRIPT = `\
 // SA660 → SAP IDoc DELVRY03 — EDI_DC40 control record
@@ -179,43 +180,43 @@ export const DEMO_GROOVY_SCRIPT = `\
 
 def header = input.segment660
 
-return [
-  EDI_DC40: [
-    TABNAM : 'EDI_DC40',
-    MANDT  : '',
-    DOCNUM : header.Belegnummer,
-    DOCREL : '',
-    STATUS : '30',
-    DIRECT : '1',          // Ausgang
-    OUTMOD : '1',
-    EXPRSS : '',
-    TEST   : '',
-    IDOCTYP: 'DELVRY03',
-    MESTYP : 'DELVRY',
-    MESCOD : '',
-    MESFCT : '',
-    STD    : '',
-    STDVRS : '',
-    STDMES : '',
-    SNDPOR : '',
-    SNDPRT : 'LS',
-    SNDPFC : '',
-    SNDPRN : header.Lieferantennummer,
-    SNDSAD : '',
-    SNDLAD : '',
-    RCVPOR : '',
-    RCVPRT : 'KU',
-    RCVPFC : '',
-    RCVPRN : header.Empfaenger,
-    RCVSAD : '',
-    RCVLAD : '',
-    CREDAT : header.Belegdatum,
-    CRETIM : '',
-    REFINT : '',
-    REFGRP : "LIEFDAT:\${header.Lieferdatum}",
-    REFMES : header.'SAP-Liefernummer',
-    ARCKEY : '',
-    SERIAL : ''
-  ]
-]
+return target {
+  EDI_DC40 {
+    TABNAM ('EDI_DC40')
+    MANDT  ('')
+    DOCNUM (header.Belegnummer)
+    DOCREL ('')
+    STATUS ('30')
+    DIRECT ('1')           // Ausgang
+    OUTMOD ('1')
+    EXPRSS ('')
+    TEST   ('')
+    IDOCTYP('DELVRY03')
+    MESTYP ('DELVRY')
+    MESCOD ('')
+    MESFCT ('')
+    STD    ('')
+    STDVRS ('')
+    STDMES ('')
+    SNDPOR ('')
+    SNDPRT ('LS')
+    SNDPFC ('')
+    SNDPRN (header.Lieferantennummer)
+    SNDSAD ('')
+    SNDLAD ('')
+    RCVPOR ('')
+    RCVPRT ('KU')
+    RCVPFC ('')
+    RCVPRN (header.Empfaenger)
+    RCVSAD ('')
+    RCVLAD ('')
+    CREDAT (header.Belegdatum)
+    CRETIM ('')
+    REFINT ('')
+    REFGRP ("LIEFDAT:\${header.Lieferdatum}")
+    REFMES (header.'SAP-Liefernummer')
+    ARCKEY ('')
+    SERIAL ('')
+  }
+}
 `;

@@ -92,3 +92,37 @@ func TestGroovyBridge_Execute_InvalidScript(t *testing.T) {
 		t.Error("expected error for invalid Groovy script")
 	}
 }
+
+func TestGroovyBridge_Execute_TargetBuilderDSL(t *testing.T) {
+	bridge := groovy.NewGroovyBridge()
+	if !bridge.Available {
+		t.Skip("java not available in test environment")
+	}
+
+	script := `
+return target {
+  EDI_DC40 {
+    DOCNUM(input.docNumber)
+    STATUS('30')
+  }
+}
+`
+	result, err := bridge.EvaluateScript(script, map[string]interface{}{"docNumber": "1009378"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := result.(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected map, got %T: %v", result, result)
+	}
+	edi, ok := m["EDI_DC40"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected EDI_DC40 map, got %T", m["EDI_DC40"])
+	}
+	if edi["DOCNUM"] != "1009378" {
+		t.Errorf("expected DOCNUM=1009378, got %v", edi["DOCNUM"])
+	}
+	if edi["STATUS"] != "30" {
+		t.Errorf("expected STATUS=30, got %v", edi["STATUS"])
+	}
+}

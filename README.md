@@ -51,7 +51,7 @@ t2tedit/
 | `internal/models` | Shared types: `Mapping`, `MappingRule`, `TransformResult`, `SchemaField` … |
 | `internal/parser` | `ParseSchema` – recursively converts a JSON value into a `[]SchemaField` tree; `ExtractValue` / `SetValue` for dot-notation path operations |
 | `internal/transform` | `Engine.Transform` – applies rules; `Engine.ValidateMapping` – validates a mapping definition |
-| `internal/groovy` | `GroovyBridge` – detects the `groovy` CLI at startup and executes scripts via subprocess. Bindings are serialised to a separate JSON temp file (loaded with `JsonSlurper`) to prevent injection through binding values |
+| `internal/groovy` | `GroovyBridge` – detects the `java` CLI at startup; the embedded `groovy-all.jar` is extracted to a temp file on first use and scripts are executed via `java -jar`. Bindings are serialised to a separate JSON temp file (loaded with `JsonSlurper`) to prevent injection through binding values |
 | `internal/api` | `Handlers` struct wiring all dependencies; gorilla/mux routes |
 
 ### REST API
@@ -97,14 +97,15 @@ POST /api/transform
 
 ## Groovy / JVM Integration
 
-The backend detects the `groovy` CLI at startup via `exec.LookPath("groovy")`. When a `groovy`-type rule is executed the engine:
+The backend embeds `groovy-all-2.4.21.jar` directly in the compiled binary. No separate Groovy installation is required — only a Java runtime (JRE 8 or later) needs to be available on the host system. Java is detected at startup via `exec.LookPath("java")`.
 
-1. Serialises all variable bindings to a temporary JSON file.
-2. Generates a wrapper Groovy script that uses `JsonSlurper` to load bindings from the file (never interpolated into the script string).
-3. Executes `groovy <script_file>` as a subprocess.
-4. Parses the JSON output from stdout as the result.
+When a `groovy`-type rule is executed the engine:
 
-This RPC-over-subprocess approach avoids the complexity of JNI / CGO while remaining practical for most deployment scenarios. The `Available` flag on `GroovyBridge` allows the API to report Groovy status and gracefully degrade when the JVM is absent.
+1. Extracts the embedded `groovy-all.jar` to a temporary file (once per process lifetime).
+2. Serialises all variable bindings to a temporary JSON file.
+3. Generates a wrapper Groovy script that uses `JsonSlurper` to load bindings from the file (never interpolated into the script string).
+4. Executes `java -jar groovy-all.jar <script_file>` as a subprocess.
+5. Parses the JSON output from stdout as the result.
 
 ### Groovy script example
 

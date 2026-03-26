@@ -7,17 +7,49 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
+
+	_ "embed"
 )
 
-// GroovyBridge executes Groovy scripts via subprocess.
+//go:embed jar/groovy-all-2.4.21.jar
+var groovyAllJar []byte
+
+// GroovyBridge executes Groovy scripts via subprocess using the embedded groovy-all.jar.
 type GroovyBridge struct {
 	Available bool
+
+	jarOnce sync.Once
+	jarPath string
+	jarErr  error
 }
 
-// NewGroovyBridge creates a GroovyBridge and checks whether the groovy command is available.
+// NewGroovyBridge creates a GroovyBridge and checks whether the java command is available.
+// The embedded groovy-all.jar is extracted to a temporary file on first use.
 func NewGroovyBridge() *GroovyBridge {
-	_, err := exec.LookPath("groovy")
+	_, err := exec.LookPath("java")
 	return &GroovyBridge{Available: err == nil}
+}
+
+// jarFilePath returns the path to the extracted groovy-all.jar, extracting it on first call.
+// The extracted file lives for the process lifetime and is cleaned up by the OS on process exit.
+func (g *GroovyBridge) jarFilePath() (string, error) {
+	g.jarOnce.Do(func() {
+		f, err := os.CreateTemp("", "groovy-all-*.jar")
+		if err != nil {
+			g.jarErr = fmt.Errorf("failed to create temp jar file: %w", err)
+			return
+		}
+		_, err = f.Write(groovyAllJar)
+		f.Close()
+		if err != nil {
+			os.Remove(f.Name())
+			g.jarErr = fmt.Errorf("failed to write groovy-all.jar: %w", err)
+			return
+		}
+		g.jarPath = f.Name()
+	})
+	return g.jarPath, g.jarErr
 }
 
 // Execute runs a Groovy script with the provided variable bindings.
@@ -26,7 +58,12 @@ func NewGroovyBridge() *GroovyBridge {
 // The script must produce a value that is printed as JSON via JsonOutput.toJson().
 func (g *GroovyBridge) Execute(script string, bindings map[string]interface{}) (interface{}, error) {
 	if !g.Available {
-		return nil, fmt.Errorf("Groovy runtime not available")
+		return nil, fmt.Errorf("Groovy runtime not available (java not found)")
+	}
+
+	jarPath, err := g.jarFilePath()
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare groovy-all.jar: %w", err)
 	}
 
 	// Write bindings to a separate JSON file to avoid injection through binding values.
@@ -82,7 +119,7 @@ func (g *GroovyBridge) Execute(script string, bindings map[string]interface{}) (
 		return nil, fmt.Errorf("failed to resolve script path: %w", err)
 	}
 
-	out, err := exec.Command("groovy", absPath).Output()
+	out, err := exec.Command("java", "-jar", jarPath, absPath).Output()
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			return nil, fmt.Errorf("groovy script failed: %s", string(exitErr.Stderr))

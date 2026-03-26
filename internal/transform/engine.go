@@ -5,9 +5,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/wlmost/t2tedit/backend/internal/groovy"
-	"github.com/wlmost/t2tedit/backend/internal/models"
-	"github.com/wlmost/t2tedit/backend/internal/parser"
+	"github.com/wlmost/t2tedit/internal/groovy"
+	"github.com/wlmost/t2tedit/internal/models"
+	"github.com/wlmost/t2tedit/internal/parser"
 )
 
 // Engine applies mapping rules to transform input data.

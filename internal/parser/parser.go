@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/wlmost/t2tedit/backend/internal/models"
+	"github.com/wlmost/t2tedit/internal/models"
 )
 
 // ParseSchema recursively parses a JSON object into a SchemaField tree.

@@ -3,8 +3,8 @@ package transform_test
 import (
 	"testing"
 
-	"github.com/wlmost/t2tedit/backend/internal/models"
-	"github.com/wlmost/t2tedit/backend/internal/transform"
+	"github.com/wlmost/t2tedit/internal/models"
+	"github.com/wlmost/t2tedit/internal/transform"
 )
 
 func TestTransform_DirectRule(t *testing.T) {

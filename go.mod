@@ -1,4 +1,4 @@
-module github.com/wlmost/t2tedit/backend
+module github.com/wlmost/t2tedit
 
 go 1.21
 

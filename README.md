@@ -20,14 +20,13 @@ A full-stack mapping editor for transforming JSON data between formats using vis
 
 ```
 t2tedit/
-├── backend/                   # Go HTTP API server
-│   ├── cmd/server/main.go     # Entry point
-│   └── internal/
-│       ├── api/               # HTTP handlers & router (gorilla/mux)
-│       ├── models/            # Shared data types
-│       ├── parser/            # JSON schema parsing & path utilities
-│       ├── transform/         # Transformation engine (direct/template/Groovy)
-│       └── groovy/            # Groovy subprocess bridge
+├── cmd/server/main.go         # Entry point (Go HTTP API server)
+├── internal/
+│   ├── api/                   # HTTP handlers & router (gorilla/mux)
+│   ├── models/                # Shared data types
+│   ├── parser/                # JSON schema parsing & path utilities
+│   ├── transform/             # Transformation engine (direct/template/Groovy)
+│   └── groovy/                # Groovy subprocess bridge
 └── frontend/                  # React + TypeScript (Vite)
     └── src/
         ├── components/
@@ -137,7 +136,6 @@ Built with React 18 + TypeScript + Vite. No external UI component library — st
 ### Backend
 
 ```bash
-cd backend
 go run ./cmd/server/main.go
 # Server starts on :8080  (override with PORT env var)
 ```
@@ -162,7 +160,6 @@ npm run build
 ### Running tests
 
 ```bash
-cd backend
 go test ./...
 ```
 
@@ -195,8 +192,11 @@ RUN npm run build
 
 # Stage 2 – backend + embedded frontend
 FROM golang:1.21-alpine AS be
-WORKDIR /app/backend
-COPY backend/ .
+WORKDIR /app
+COPY go.mod go.sum ./
+RUN go mod download
+COPY cmd/ ./cmd/
+COPY internal/ ./internal/
 RUN go build -o /t2tedit ./cmd/server
 
 FROM alpine:3.19

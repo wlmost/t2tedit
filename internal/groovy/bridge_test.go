@@ -3,7 +3,7 @@ package groovy_test
 import (
 	"testing"
 
-	"github.com/wlmost/t2tedit/backend/internal/groovy"
+	"github.com/wlmost/t2tedit/internal/groovy"
 )
 
 func TestNewGroovyBridge_Available(t *testing.T) {

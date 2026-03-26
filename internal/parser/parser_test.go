@@ -3,7 +3,7 @@ package parser_test
 import (
 	"testing"
 
-	"github.com/wlmost/t2tedit/backend/internal/parser"
+	"github.com/wlmost/t2tedit/internal/parser"
 )
 
 func TestExtractValue_TopLevel(t *testing.T) {

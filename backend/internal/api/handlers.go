@@ -237,7 +237,9 @@ func (h *Handlers) GroovyStatus(w http.ResponseWriter, r *http.Request) {
 		"version":   "",
 	}
 	if h.groovyBridge.Available {
-		out, err := exec.Command("groovy", "--version").Output()
+		// java -version writes to stderr
+		cmd := exec.Command("java", "-version")
+		out, err := cmd.CombinedOutput()
 		if err == nil {
 			resp["version"] = strings.TrimSpace(string(out))
 		}

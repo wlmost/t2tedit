@@ -170,15 +170,15 @@ export const DEMO_RULES: MappingRule[] = [
 
 /**
  * Groovy script for the SA660 → IDoc DELVRY03 mapping.
- * The `input` binding holds the full SA660 source JSON.
+ * The `source` binding holds the full SA660 source JSON.
  * The script uses the target{} builder DSL (ySE-compatible) to define the target
  * structure without array literals.
  */
 export const DEMO_GROOVY_SCRIPT = `\
 // SA660 → SAP IDoc DELVRY03 — EDI_DC40 control record
-// Available binding: input (full SA660 JSON)
+// Available binding: source (full SA660 JSON)
 
-def header = input.segment660
+def header = source.segment660
 
 return target {
   EDI_DC40 {

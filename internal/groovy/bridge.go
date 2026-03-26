@@ -164,9 +164,9 @@ def target = { Closure c ->
 	return result, nil
 }
 
-// EvaluateScript is a convenience method that executes a Groovy script with `input` bound to the
+// EvaluateScript is a convenience method that executes a Groovy script with `source` bound to the
 // provided value.
 func (g *GroovyBridge) EvaluateScript(script string, input interface{}) (interface{}, error) {
-	return g.Execute(script, map[string]interface{}{"input": input})
+	return g.Execute(script, map[string]interface{}{"source": input})
 }
 

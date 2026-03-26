@@ -54,7 +54,7 @@ func TestGroovyBridge_Execute_InputBinding(t *testing.T) {
 	input := map[string]interface{}{
 		"user": map[string]interface{}{"firstName": "Alice"},
 	}
-	result, err := bridge.EvaluateScript(`input.user.firstName.toLowerCase()`, input)
+	result, err := bridge.EvaluateScript(`source.user.firstName.toLowerCase()`, input)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -102,7 +102,7 @@ func TestGroovyBridge_Execute_TargetBuilderDSL(t *testing.T) {
 	script := `
 return target {
   EDI_DC40 {
-    DOCNUM(input.docNumber)
+    DOCNUM(source.docNumber)
     STATUS('30')
   }
 }

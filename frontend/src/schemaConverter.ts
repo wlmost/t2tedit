@@ -10,6 +10,7 @@
  *  - JSON (.json)             → pass-through
  *  - XSD / XML Schema (.xsd)  → builds a representative JSON object from
  *                               xs:element / xs:complexType definitions
+ *  - XML actual data (.xml)   → converts element hierarchy to a JSON object
  *  - CSV (.csv)               → first row (header) becomes a flat JSON object
  *                               with empty-string field values
  *  - SAP flat-file parser files (.p, .par, .txt, .csv with SAP field notation)
@@ -424,6 +425,157 @@ function convertDelimited(content: string): ConversionResult {
   }
 
   return { ok: true, json: result, format: 'CSV' };
+}
+
+// ---------------------------------------------------------------------------
+// Data file converter (for example input data, preserves actual values)
+// ---------------------------------------------------------------------------
+
+/**
+ * Converts various data file formats into a JSON value suitable for use as
+ * example input data in t2tedit.  Unlike {@link convertSchemaFile}, this
+ * function preserves actual field values from the file and converts
+ * multi-row CSV files to arrays of objects.
+ *
+ * Supported formats:
+ *  - JSON  → pass-through
+ *  - XML   → element hierarchy converted to a JSON object (actual data, not XSD)
+ *  - CSV   → all data rows converted to an array of JSON objects
+ *  - Other → falls back to {@link convertSchemaFile} (schema-style conversion)
+ */
+export function convertDataFile(filename: string, content: string): ConversionResult {
+  const ext = filename.split('.').pop()?.toLowerCase() ?? '';
+
+  // 1. Explicit JSON
+  if (ext === 'json') return convertJSON(content);
+
+  // 2. XML actual data (not XSD schema)
+  if (
+    ext === 'xml' ||
+    (content.trimStart().startsWith('<?xml') && !isXSD(content))
+  ) {
+    return convertXMLData(content);
+  }
+
+  // 3. Try JSON anyway (e.g. .txt that happens to contain JSON)
+  const jsonTry = tryJSON(content);
+  if (jsonTry !== null) return { ok: true, json: jsonTry, format: 'JSON' };
+
+  // 4. CSV with all rows as array of objects
+  if (ext === 'csv') return convertCSVData(content);
+
+  // 5. Fall back to schema-style conversion for SAP parser and other formats
+  return convertSchemaFile(filename, content);
+}
+
+// ---------------------------------------------------------------------------
+// XML actual data (not XSD)
+// ---------------------------------------------------------------------------
+
+function convertXMLData(content: string): ConversionResult {
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(content, 'application/xml');
+    const parseError = doc.querySelector('parsererror');
+    if (parseError) {
+      return {
+        ok: false,
+        error: `XML parse error: ${parseError.textContent?.trim().slice(0, 120) ?? 'unknown'}`,
+      };
+    }
+    const json = xmlElementToJSON(doc.documentElement);
+    return { ok: true, json: { [doc.documentElement.localName ?? doc.documentElement.nodeName]: json }, format: 'XML' };
+  } catch (e: unknown) {
+    return {
+      ok: false,
+      error: `XML conversion failed: ${e instanceof Error ? e.message : String(e)}`,
+    };
+  }
+}
+
+function xmlElementToJSON(el: Element): unknown {
+  const result: Record<string, unknown> = {};
+
+  // Preserve attributes
+  for (const attr of Array.from(el.attributes)) {
+    result[`@${attr.name}`] = attr.value;
+  }
+
+  const childElements = Array.from(el.children);
+
+  if (childElements.length === 0) {
+    // Leaf node — return the text value (with conservative type coercion)
+    const text = el.textContent?.trim() ?? '';
+    if (Object.keys(result).length === 0) {
+      if (text !== '' && /^-?\d+(\.\d+)?$/.test(text)) return Number(text);
+      if (text.toLowerCase() === 'true') return true;
+      if (text.toLowerCase() === 'false') return false;
+      return text;
+    }
+    if (text) result['#text'] = text;
+    return result;
+  }
+
+  // Group children by tag name so repeated elements become arrays
+  const groups: Record<string, Element[]> = {};
+  for (const child of childElements) {
+    const name = child.localName ?? child.nodeName;
+    if (!groups[name]) groups[name] = [];
+    groups[name].push(child);
+  }
+
+  for (const [name, children] of Object.entries(groups)) {
+    result[name] =
+      children.length === 1
+        ? xmlElementToJSON(children[0])
+        : children.map(xmlElementToJSON);
+  }
+
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// CSV data (all rows as array of objects)
+// ---------------------------------------------------------------------------
+
+function convertCSVData(content: string): ConversionResult {
+  const lines = content.split('\n').filter((l) => { const t = l.trim(); return t && !t.startsWith('#'); });
+  if (lines.length === 0) return { ok: false, error: 'Empty file' };
+
+  const delim = detectDelimiter(content);
+  const headers = lines[0].split(delim).map((h) => h.trim().replace(/^["']|["']$/g, ''));
+  if (headers.length < 1 || headers.every((h) => !h)) {
+    return { ok: false, error: 'No columns found' };
+  }
+
+  if (lines.length === 1) {
+    // Header only — return a single empty-value object
+    const obj: Record<string, unknown> = {};
+    for (const h of headers) {
+      if (h) obj[h] = '';
+    }
+    return { ok: true, json: obj, format: 'CSV' };
+  }
+
+  const parseValue = (v: string): unknown => {
+    if (v !== '' && /^-?\d+(\.\d+)?$/.test(v)) return Number(v);
+    if (v.toLowerCase() === 'true') return true;
+    if (v.toLowerCase() === 'false') return false;
+    return v;
+  };
+
+  const rows = lines.slice(1).map((line) => {
+    const vals = line.split(delim).map((v) => v.trim().replace(/^["']|["']$/g, ''));
+    const row: Record<string, unknown> = {};
+    headers.forEach((h, i) => {
+      if (h) row[h] = parseValue(vals[i] ?? '');
+    });
+    return row;
+  });
+
+  // Single data row → return as plain object (no wrapping array)
+  if (rows.length === 1) return { ok: true, json: rows[0], format: 'CSV' };
+  return { ok: true, json: rows, format: 'CSV' };
 }
 
 // ---------------------------------------------------------------------------

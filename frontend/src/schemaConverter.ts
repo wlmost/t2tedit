@@ -394,30 +394,42 @@ function xsdPrimitiveDefault(typeName: string): unknown {
 
 // ---------------------------------------------------------------------------
 // SAP IDoc parser file format
-// BEGIN_RECORD_SECTION / BEGIN_CONTROL_RECORD / BEGIN_DATA_RECORD <name>
-//   BEGIN_FIELDS
-//     NAME                TABNAM
-//     TEXT                Name der Tabellenstruktur
-//     TYPE                CHARACTER
-//     LENGTH              000010
-//     FIELD_POS           0001
-//     CHARACTER_FIRST     000001
-//     CHARACTER_LAST      000010
-//   END_FIELDS
-// END_CONTROL_RECORD / END_DATA_RECORD
-// END_RECORD_SECTION
 //
-// The control record is always stored under the key "EDI_DC40".
-// Data records use the name from BEGIN_DATA_RECORD or the SEGMENTTYPE attribute.
+// A SAP IDoc parser file has two sections:
+//
+// 1. BEGIN_RECORD_SECTION — defines the IDoc envelope record formats:
+//    - BEGIN_CONTROL_RECORD  → stored as segment key "EDI_DC40"
+//    - BEGIN_DATA_RECORD     → generic data record (SEGNAM, SDATA fields);
+//                              NOT a real segment type — skipped from schema output
+//    - BEGIN_STATUS_RECORD   → status record — skipped
+//
+// 2. BEGIN_SEGMENT_SECTION  — defines the actual business segment structures:
+//    - BEGIN_IDOC <name>     → IDOC type wrapper (skipped)
+//    - BEGIN_GROUP <n>       → group wrapper, may be nested (skipped)
+//    - BEGIN_SEGMENT <type>  → followed by SEGMENTTYPE <name> → stored under <name>
+//      BEGIN_FIELDS
+//        NAME                VBELN
+//        TYPE                CHARACTER
+//        CHARACTER_FIRST     000064
+//        CHARACTER_LAST      000073
+//      END_FIELDS
+//    END_SEGMENT
+//
 // Character positions (1-indexed) are stored in a `_positions` meta-key so that
 // convertDataFile() can later extract values from fixed-length IDoc data files.
+//
+// In a standard SAP IDoc flat file every data record line starts with the
+// segment name (SEGNAM) at characters 1–30.  This position is injected into
+// each non-EDI_DC40 segment's positions map automatically so that
+// convertIdocDataWithPositions() can identify which segment each line belongs to.
 // ---------------------------------------------------------------------------
 
 function isSAPIdocParser(content: string): boolean {
   return (
     /^\s*BEGIN_RECORD_SECTION\s*$/m.test(content) ||
     /^\s*BEGIN_CONTROL_RECORD\s*$/m.test(content) ||
-    /^\s*BEGIN_DATA_RECORD\b/m.test(content)
+    /^\s*BEGIN_DATA_RECORD\b/m.test(content) ||
+    /^\s*BEGIN_SEGMENT_SECTION\s*$/m.test(content)
   );
 }
 
@@ -428,12 +440,15 @@ function convertSAPIdocParser(content: string): ConversionResult {
   const positions: Record<string, Record<string, [number, number]>> = {};
 
   let currentRecord: string | null = null;
-  let pendingSegType = false; // true when BEGIN_DATA_RECORD had no inline name
+  // true when BEGIN_SEGMENT or unnamed BEGIN_DATA_RECORD was seen and SEGMENTTYPE not yet received
+  let pendingSegType = false;
+  // true for records whose fields should be collected into schema (false = skip)
+  let collectSchema = true;
   let inFields = false;
   let currentFieldAttrs: Record<string, string> = {};
 
   const flushField = () => {
-    if (!currentFieldAttrs.NAME || !currentRecord) {
+    if (!currentFieldAttrs.NAME || !currentRecord || !collectSchema) {
       currentFieldAttrs = {};
       return;
     }
@@ -453,6 +468,14 @@ function convertSAPIdocParser(content: string): ConversionResult {
     currentFieldAttrs = {};
   };
 
+  const resetState = () => {
+    currentRecord = null;
+    pendingSegType = false;
+    collectSchema = true;
+    inFields = false;
+    currentFieldAttrs = {};
+  };
+
   for (const rawLine of content.split('\n')) {
     const line = rawLine.trim();
 
@@ -462,66 +485,97 @@ function convertSAPIdocParser(content: string): ConversionResult {
       continue;
     }
 
+    // ── Major section boundaries ───────────────────────────────────────────
     if (line === 'BEGIN_RECORD_SECTION' || line === 'END_RECORD_SECTION') continue;
+    if (line === 'BEGIN_SEGMENT_SECTION' || line === 'END_SEGMENT_SECTION') continue;
 
+    // ── Wrappers within BEGIN_SEGMENT_SECTION (skip; segments are parsed directly) ──
+    if (/^BEGIN_IDOC\b/.test(line) || line === 'END_IDOC') continue;
+    if (/^BEGIN_GROUP\b/.test(line) || /^END_GROUP\b/.test(line)) continue;
+
+    // ── Control record → EDI_DC40 ──────────────────────────────────────────
     if (line === 'BEGIN_CONTROL_RECORD') {
+      resetState();
       currentRecord = 'EDI_DC40';
-      pendingSegType = false;
-      inFields = false;
-      currentFieldAttrs = {};
+      collectSchema = true;
       continue;
     }
-
     if (line.startsWith('END_CONTROL_RECORD')) {
       if (inFields) flushField();
-      currentRecord = null;
-      inFields = false;
+      resetState();
       continue;
     }
 
+    // ── Generic data record (IDoc envelope: SEGNAM, SDATA …) ──────────────
+    // Not a real segment type — skip from schema output.  We know the SEGNAM
+    // position is always [1,30] in standard SAP IDoc files, so no need to parse.
     const dataRecordMatch = line.match(/^BEGIN_DATA_RECORD(?:\s+(\S+))?/);
     if (dataRecordMatch) {
+      resetState();
       if (dataRecordMatch[1]) {
+        // Named BEGIN_DATA_RECORD (uncommon) — collect it as a proper segment
         currentRecord = dataRecordMatch[1];
-        pendingSegType = false;
+        collectSchema = true;
       } else {
-        // Name will come from a SEGMENTTYPE attribute
-        currentRecord = null;
-        pendingSegType = true;
+        // Generic envelope record — skip field collection
+        collectSchema = false;
       }
-      inFields = false;
-      currentFieldAttrs = {};
       continue;
     }
-
     if (line.startsWith('END_DATA_RECORD')) {
       if (inFields) flushField();
-      currentRecord = null;
-      pendingSegType = false;
-      inFields = false;
+      resetState();
       continue;
     }
 
+    // ── Status record — skip entirely ──────────────────────────────────────
+    if (line === 'BEGIN_STATUS_RECORD') {
+      resetState();
+      collectSchema = false;
+      continue;
+    }
+    if (line.startsWith('END_STATUS_RECORD')) {
+      if (inFields) flushField();
+      resetState();
+      continue;
+    }
+
+    // ── BEGIN_SEGMENT in BEGIN_SEGMENT_SECTION ─────────────────────────────
+    // The segment type name comes from the SEGMENTTYPE attribute that follows.
+    if (/^BEGIN_SEGMENT\b/.test(line)) {
+      if (inFields) flushField();
+      resetState();
+      pendingSegType = true; // await SEGMENTTYPE attribute
+      collectSchema = true;
+      continue;
+    }
+    if (/^END_SEGMENT\b/.test(line)) {
+      if (inFields) flushField();
+      resetState();
+      continue;
+    }
+
+    // ── BEGIN_FIELDS / END_FIELDS ──────────────────────────────────────────
     if (line === 'BEGIN_FIELDS') {
       inFields = true;
       currentFieldAttrs = {};
       continue;
     }
-
     if (line === 'END_FIELDS') {
       if (inFields) flushField();
       inFields = false;
       continue;
     }
 
-    // Attribute line: "NAME    TABNAM", "TYPE    CHARACTER", "SEGMENTTYPE  E1EDL20" …
-    const attrMatch = line.match(/^([A-Z_]+)\s+(.*)/);
+    // ── Attribute line: "NAME TABNAM", "SEGMENTTYPE E1EDL20", … ──────────
+    const attrMatch = line.match(/^([A-Z][A-Z_0-9]*)\s+(.*)/);
     if (!attrMatch) continue;
 
     const attrKey = attrMatch[1];
     const attrValue = attrMatch[2].trim();
 
-    // SEGMENTTYPE sets the record name when BEGIN_DATA_RECORD had no inline name
+    // SEGMENTTYPE sets the record name (applies both to unnamed BEGIN_DATA_RECORD
+    // and to BEGIN_SEGMENT blocks)
     if (attrKey === 'SEGMENTTYPE' && pendingSegType && !inFields) {
       currentRecord = attrValue;
       pendingSegType = false;
@@ -542,9 +596,21 @@ function convertSAPIdocParser(content: string): ConversionResult {
   // Flush any trailing field
   if (inFields) flushField();
 
-  const recordNames = Object.keys(schema);
-  if (recordNames.length === 0) {
+  if (Object.keys(schema).length === 0) {
     return { ok: false, error: 'No records found in SAP IDoc parser file' };
+  }
+
+  // Inject the standard SAP IDoc data record identifier position into each
+  // non-control segment.  In a standard SAP IDoc flat file every data record
+  // line starts with the segment name (SEGNAM) at characters 1–30.
+  // This lets convertIdocDataWithPositions() match each data line to the
+  // correct segment without needing to parse the generic data record.
+  for (const segName of Object.keys(schema)) {
+    if (segName === 'EDI_DC40') continue;
+    if (!positions[segName]) positions[segName] = {};
+    if (!('SEGNAM' in positions[segName])) {
+      positions[segName]['SEGNAM'] = [1, 30];
+    }
   }
 
   // Build the result object; attach positions as a meta-key for data conversion

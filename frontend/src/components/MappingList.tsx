@@ -13,7 +13,7 @@ export function MappingList({ mappings, selectedId, onSelect, onCreate, onLoadDe
   return (
     <div className="mapping-list">
       <div className="mapping-list-header">
-        <button className="btn btn-primary btn-full" onClick={onCreate}>+ New Mapping</button>
+        <button className="btn btn-primary btn-full" onClick={onCreate}>📄 New Mapping…</button>
         <button className="btn btn-secondary btn-full mapping-demo-btn" onClick={onLoadDemo} title="Load SA660 → IDoc DELVRY03 demo">
           ▶ Load SA660 → IDoc Demo
         </button>

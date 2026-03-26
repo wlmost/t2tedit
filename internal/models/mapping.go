@@ -21,6 +21,8 @@ type Mapping struct {
 	SourceSchema interface{}   `json:"sourceSchema"`
 	TargetSchema interface{}   `json:"targetSchema"`
 	Rules        []MappingRule `json:"rules"`
+	GroovyScript string        `json:"groovyScript,omitempty"`
+	ExampleData  interface{}   `json:"exampleData,omitempty"`
 	CreatedAt    time.Time     `json:"createdAt"`
 	UpdatedAt    time.Time     `json:"updatedAt"`
 }

@@ -4,6 +4,7 @@ import type { Mapping, MappingRule, SchemaField, TransformResult, ValidationResu
 import { JsonEditor } from './JsonEditor';
 import { SchemaTree } from './SchemaTree';
 import { RuleRow } from './RuleRow';
+import { mappingToGroovyFile, downloadTextFile, mappingFilename } from '../mappingFile';
 
 type Tab = 'script' | 'mapping' | 'rules' | 'preview';
 
@@ -32,14 +33,18 @@ export function MappingEditor({ mapping, onSave }: MappingEditorProps) {
   const [selectedTarget, setSelectedTarget] = useState<SchemaField | null>(null);
 
   const [inputJson, setInputJson] = useState(
-    mapping.sourceSchema ? JSON.stringify(mapping.sourceSchema, null, 2) : '{}'
+    mapping.exampleData
+      ? JSON.stringify(mapping.exampleData, null, 2)
+      : mapping.sourceSchema ? JSON.stringify(mapping.sourceSchema, null, 2) : '{}'
   );
   const [transformResult, setTransformResult] = useState<TransformResult | null>(null);
 
   // Groovy Script tab state
-  const [groovyScript, setGroovyScript] = useState((mapping as any).groovyScript ?? '');
+  const [groovyScript, setGroovyScript] = useState(mapping.groovyScript ?? '');
   const [scriptInputJson, setScriptInputJson] = useState(
-    mapping.sourceSchema ? JSON.stringify(mapping.sourceSchema, null, 2) : '{}'
+    mapping.exampleData
+      ? JSON.stringify(mapping.exampleData, null, 2)
+      : mapping.sourceSchema ? JSON.stringify(mapping.sourceSchema, null, 2) : '{}'
   );
   const [scriptResult, setScriptResult] = useState<{ success: boolean; result?: any; error?: string; durationMs: number } | null>(null);
   const [scriptRunning, setScriptRunning] = useState(false);
@@ -60,10 +65,18 @@ export function MappingEditor({ mapping, onSave }: MappingEditorProps) {
     setTargetFields([]);
     setSelectedSource(null);
     setSelectedTarget(null);
-    setInputJson(mapping.sourceSchema ? JSON.stringify(mapping.sourceSchema, null, 2) : '{}');
+    setInputJson(
+      mapping.exampleData
+        ? JSON.stringify(mapping.exampleData, null, 2)
+        : mapping.sourceSchema ? JSON.stringify(mapping.sourceSchema, null, 2) : '{}'
+    );
     setTransformResult(null);
-    setGroovyScript((mapping as any).groovyScript ?? '');
-    setScriptInputJson(mapping.sourceSchema ? JSON.stringify(mapping.sourceSchema, null, 2) : '{}');
+    setGroovyScript(mapping.groovyScript ?? '');
+    setScriptInputJson(
+      mapping.exampleData
+        ? JSON.stringify(mapping.exampleData, null, 2)
+        : mapping.sourceSchema ? JSON.stringify(mapping.sourceSchema, null, 2) : '{}'
+    );
     setScriptResult(null);
     setValidation(null);
     setError(null);
@@ -181,12 +194,18 @@ export function MappingEditor({ mapping, onSave }: MappingEditorProps) {
     setSaving(true);
     setError(null);
     try {
-      await onSave(draft);
-    } catch (err: any) {
-      setError(err.message);
+      await onSave({ ...draft, groovyScript });
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setSaving(false);
     }
+  }
+
+  function handleExportToFile() {
+    const merged: Mapping = { ...draft, groovyScript };
+    const content = mappingToGroovyFile(merged);
+    downloadTextFile(mappingFilename(merged.name), content);
   }
 
   async function handleValidate() {
@@ -194,8 +213,8 @@ export function MappingEditor({ mapping, onSave }: MappingEditorProps) {
     try {
       const result = await api.validate(draft);
       setValidation(result);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
     }
   }
 
@@ -205,8 +224,8 @@ export function MappingEditor({ mapping, onSave }: MappingEditorProps) {
       const inputData = JSON.parse(inputJson);
       const result = await api.transform({ mapping: draft, inputData });
       setTransformResult(result);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
     }
   }
 
@@ -234,6 +253,9 @@ export function MappingEditor({ mapping, onSave }: MappingEditorProps) {
         </div>
         <div className="editor-header-actions">
           <button className="btn btn-secondary" onClick={handleValidate}>Validate</button>
+          <button className="btn btn-secondary" onClick={handleExportToFile} title="Export mapping as .groovy file">
+            💾 Export
+          </button>
           <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
             {saving ? 'Saving…' : 'Save'}
           </button>

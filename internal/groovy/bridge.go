@@ -97,6 +97,34 @@ func (g *GroovyBridge) Execute(script string, bindings map[string]interface{}) (
 		sb.WriteString(fmt.Sprintf("def %s = __bindings.%s\n", name, name))
 	}
 
+	// target{} builder DSL: provides a ySE-compatible way to define the target structure
+	// without using Groovy array/map literal syntax.
+	sb.WriteString(`
+class __MapBuilder {
+    private def __data = [:]
+    def methodMissing(String name, args) {
+        if (args && args.length > 0 && args[0] instanceof Closure) {
+            def sub = new __MapBuilder()
+            def cl = args[0]
+            cl.delegate = sub
+            cl.resolveStrategy = Closure.DELEGATE_FIRST
+            cl()
+            __data[name] = sub.__data
+        } else {
+            __data[name] = (args && args.length > 0) ? args[0] : null
+        }
+    }
+    def getResult() { __data }
+}
+def target = { Closure c ->
+    def __builder = new __MapBuilder()
+    c.delegate = __builder
+    c.resolveStrategy = Closure.DELEGATE_FIRST
+    c()
+    return __builder.result
+}
+`)
+
 	sb.WriteString("\ndef result = { \n")
 	sb.WriteString(script)
 	sb.WriteString("\n}()\n")
@@ -136,9 +164,9 @@ func (g *GroovyBridge) Execute(script string, bindings map[string]interface{}) (
 	return result, nil
 }
 
-// EvaluateScript is a convenience method that executes a Groovy script with `input` bound to the
+// EvaluateScript is a convenience method that executes a Groovy script with `source` bound to the
 // provided value.
 func (g *GroovyBridge) EvaluateScript(script string, input interface{}) (interface{}, error) {
-	return g.Execute(script, map[string]interface{}{"input": input})
+	return g.Execute(script, map[string]interface{}{"source": input})
 }
 

@@ -66,8 +66,8 @@ func (e *Engine) applyRule(rule models.MappingRule, inputData interface{}, outpu
 			return "", fmt.Errorf("rule %s: groovyScript must not be empty for groovy transform", rule.ID)
 		}
 		result, err := e.groovyBridge.Execute(rule.GroovyScript, map[string]interface{}{
-			"input": inputData,
-			"value": sourceVal,
+			"source": inputData,
+			"value":  sourceVal,
 		})
 		if err != nil {
 			return "", fmt.Errorf("rule %s: groovy execution failed: %w", rule.ID, err)

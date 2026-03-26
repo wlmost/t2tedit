@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	"github.com/wlmost/t2tedit/backend/internal/groovy"
-	"github.com/wlmost/t2tedit/backend/internal/models"
-	"github.com/wlmost/t2tedit/backend/internal/parser"
-	"github.com/wlmost/t2tedit/backend/internal/transform"
+	"github.com/wlmost/t2tedit/internal/groovy"
+	"github.com/wlmost/t2tedit/internal/models"
+	"github.com/wlmost/t2tedit/internal/parser"
+	"github.com/wlmost/t2tedit/internal/transform"
 )
 
 // Handlers holds shared dependencies for all HTTP handlers.

@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/wlmost/t2tedit/backend/internal/api"
+	"github.com/wlmost/t2tedit/internal/api"
 )
 
 func main() {

@@ -7,8 +7,8 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/rs/cors"
-	"github.com/wlmost/t2tedit/backend/internal/groovy"
-	"github.com/wlmost/t2tedit/backend/internal/transform"
+	"github.com/wlmost/t2tedit/internal/groovy"
+	"github.com/wlmost/t2tedit/internal/transform"
 )
 
 // NewRouter creates and returns the configured HTTP router with CORS support.

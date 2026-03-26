@@ -7,9 +7,9 @@
 
 import type { MappingRule } from './types';
 
-/** SA660 source data (segment 660 = header, segment661 = line items) */
+/** SA660 source data (segment 660 = header, segment 661 = line items) */
 export const SA660_SOURCE = {
-  segment660: {
+  '660': {
     Satzart: '660',
     'NL-Nummer': '897',
     Belegart: 'KULB',
@@ -34,7 +34,7 @@ export const SA660_SOURCE = {
     Abholort: '02',
     'Hybris-Bestellnummer': '000039615894',
   },
-  segment661: [
+  '661': [
     {
       Satzart: '661',
       'NL-Nummer': '897',
@@ -131,37 +131,37 @@ export const DEMO_MAPPING_DESCRIPTION =
 export const DEMO_RULES: MappingRule[] = [
   {
     id: 'demo-r1',
-    sourcePath: 'segment660.Belegnummer',
+    sourcePath: '660.Belegnummer',
     targetPath: 'EDI_DC40.DOCNUM',
     transform: 'direct',
   },
   {
     id: 'demo-r2',
-    sourcePath: 'segment660.Belegdatum',
+    sourcePath: '660.Belegdatum',
     targetPath: 'EDI_DC40.CREDAT',
     transform: 'direct',
   },
   {
     id: 'demo-r3',
-    sourcePath: 'segment660.SAP-Liefernummer',
+    sourcePath: '660.SAP-Liefernummer',
     targetPath: 'EDI_DC40.REFMES',
     transform: 'direct',
   },
   {
     id: 'demo-r4',
-    sourcePath: 'segment660.Lieferantennummer',
+    sourcePath: '660.Lieferantennummer',
     targetPath: 'EDI_DC40.SNDPRN',
     transform: 'direct',
   },
   {
     id: 'demo-r5',
-    sourcePath: 'segment660.Empfaenger',
+    sourcePath: '660.Empfaenger',
     targetPath: 'EDI_DC40.RCVPRN',
     transform: 'direct',
   },
   {
     id: 'demo-r6',
-    sourcePath: 'segment660.Lieferdatum',
+    sourcePath: '660.Lieferdatum',
     targetPath: 'EDI_DC40.REFGRP',
     transform: 'template',
     template: 'LIEFDAT:{{value}}',
@@ -171,14 +171,16 @@ export const DEMO_RULES: MappingRule[] = [
 /**
  * Groovy script for the SA660 → IDoc DELVRY03 mapping.
  * The `source` binding holds the full SA660 source JSON.
+ * Segments are accessed with quoted keys, e.g. source.'660'.fieldName.
  * The script uses the target{} builder DSL (ySE-compatible) to define the target
  * structure without array literals.
  */
 export const DEMO_GROOVY_SCRIPT = `\
 // SA660 → SAP IDoc DELVRY03 — EDI_DC40 control record
 // Available binding: source (full SA660 JSON)
+// Segments are accessed as source.'660', source.'661', etc.
 
-def header = source.segment660
+def header = source.'660'
 
 return target {
   EDI_DC40 {
@@ -197,7 +199,7 @@ return target {
     MESFCT ('')
     STD    ('')
     STDVRS ('')
-    STDMES ('')
+    STDMES (header.Satzart)
     SNDPOR ('')
     SNDPRT ('LS')
     SNDPFC ('')

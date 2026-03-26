@@ -100,14 +100,18 @@ func TestGroovyBridge_Execute_TargetBuilderDSL(t *testing.T) {
 	}
 
 	script := `
+def header = source.'660'
 return target {
   EDI_DC40 {
-    DOCNUM(source.docNumber)
+    DOCNUM(header.Belegnummer)
     STATUS('30')
   }
 }
 `
-	result, err := bridge.EvaluateScript(script, map[string]interface{}{"docNumber": "1009378"})
+	input := map[string]interface{}{
+		"660": map[string]interface{}{"Belegnummer": "1009378"},
+	}
+	result, err := bridge.EvaluateScript(script, input)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

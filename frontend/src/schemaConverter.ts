@@ -437,13 +437,21 @@ function convertDelimited(content: string): ConversionResult {
  * function preserves actual field values from the file and converts
  * multi-row CSV files to arrays of objects.
  *
+ * When a `schema` (the already-converted source schema JSON) is provided it
+ * is used to guide field-name resolution for non-self-describing formats
+ * (CSV, SAP flat-files, fixed-length text).  XML and JSON are self-describing
+ * and therefore ignore the schema.
+ *
  * Supported formats:
- *  - JSON  → pass-through
- *  - XML   → element hierarchy converted to a JSON object (actual data, not XSD)
- *  - CSV   → all data rows converted to an array of JSON objects
+ *  - JSON  → pass-through (schema not needed)
+ *  - XML   → element hierarchy converted to a JSON object (schema not needed)
+ *  - CSV   → data rows mapped to JSON objects; schema field names used when
+ *            the file has no header row
+ *  - SAP delimiter / flat-file → lines whose first token matches a schema
+ *            segment key are mapped to that segment's field names
  *  - Other → falls back to {@link convertSchemaFile} (schema-style conversion)
  */
-export function convertDataFile(filename: string, content: string): ConversionResult {
+export function convertDataFile(filename: string, content: string, schema?: unknown): ConversionResult {
   const ext = filename.split('.').pop()?.toLowerCase() ?? '';
 
   // 1. Explicit JSON
@@ -461,11 +469,153 @@ export function convertDataFile(filename: string, content: string): ConversionRe
   const jsonTry = tryJSON(content);
   if (jsonTry !== null) return { ok: true, json: jsonTry, format: 'JSON' };
 
-  // 4. CSV with all rows as array of objects
+  // 4. Schema-guided conversion (CSV, SAP delimiter, flat-file)
+  if (schema) {
+    const guided = convertDataWithSchema(content, schema);
+    if (guided.ok) return guided;
+  }
+
+  // 5. CSV with all rows as array of objects (no schema)
   if (ext === 'csv') return convertCSVData(content);
 
-  // 5. Fall back to schema-style conversion for SAP parser and other formats
+  // 6. Fall back to schema-style conversion for SAP parser and other formats
   return convertSchemaFile(filename, content);
+}
+
+// ---------------------------------------------------------------------------
+// Schema-guided data conversion
+// ---------------------------------------------------------------------------
+
+/**
+ * Uses a pre-parsed source schema (the JSON representation produced by
+ * {@link convertSchemaFile}) to map raw delimited or CSV data values to the
+ * correct field names.
+ *
+ * Two patterns are handled:
+ *
+ * 1. **Segmented schema** — schema has segment-ID keys whose values are field
+ *    objects (e.g. `{ "660": { "Satzart":"", "NL-Nummer":"" }, "661": {...} }`).
+ *    Each data line whose first delimited token is a known segment ID is parsed
+ *    by mapping subsequent tokens to that segment's field names in order.
+ *    Multiple lines with the same segment ID become an array.
+ *
+ * 2. **Flat schema** — schema is a plain field→value object
+ *    (e.g. `{ "Name":"", "Age":0, "City":"" }`).
+ *    Used as fallback column headers when the CSV/flat file has no header row
+ *    (detected by checking whether the first line is entirely non-numeric).
+ */
+function convertDataWithSchema(content: string, schema: unknown): ConversionResult {
+  if (!schema || typeof schema !== 'object' || Array.isArray(schema)) {
+    return { ok: false, error: 'Schema is not a plain object' };
+  }
+
+  const schemaObj = schema as Record<string, unknown>;
+  const schemaKeys = Object.keys(schemaObj);
+  if (schemaKeys.length === 0) return { ok: false, error: 'Empty schema' };
+
+  // Determine whether the schema is segmented: all values must be plain objects.
+  const isSegmented = schemaKeys.every(
+    (k) => schemaObj[k] !== null && typeof schemaObj[k] === 'object' && !Array.isArray(schemaObj[k]),
+  );
+
+  if (isSegmented) {
+    return convertSegmentedDataWithSchema(
+      content,
+      schemaObj as Record<string, Record<string, unknown>>,
+    );
+  }
+
+  // Flat schema — use field names as fallback column headers for CSV-style data.
+  return convertFlatDataWithSchema(content, schemaObj);
+}
+
+/**
+ * Parses delimited data whose first column is a segment ID matching a key in
+ * `schema`.  Each matched line is mapped to that segment's field names.
+ */
+function convertSegmentedDataWithSchema(
+  content: string,
+  schema: Record<string, Record<string, unknown>>,
+): ConversionResult {
+  const delim = detectDelimiter(content);
+  const result: Record<string, unknown> = {};
+  let matched = 0;
+
+  const parseValue = (v: string): unknown => {
+    if (v !== '' && /^-?\d+(\.\d+)?$/.test(v)) return Number(v);
+    if (v.toLowerCase() === 'true') return true;
+    if (v.toLowerCase() === 'false') return false;
+    return v;
+  };
+
+  for (const rawLine of content.split('\n')) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith('#') || line.startsWith('/')) continue;
+
+    const parts = line.split(delim).map((p) => p.trim());
+    const segId = parts[0];
+    if (!segId || !(segId in schema)) continue;
+
+    matched++;
+    const fieldNames = Object.keys(schema[segId]);
+    const row: Record<string, unknown> = {};
+    fieldNames.forEach((name, i) => {
+      row[name] = parseValue(parts[i] ?? '');
+    });
+
+    if (!(segId in result)) {
+      result[segId] = row;
+    } else if (Array.isArray(result[segId])) {
+      (result[segId] as unknown[]).push(row);
+    } else {
+      result[segId] = [result[segId] as unknown, row];
+    }
+  }
+
+  if (matched === 0) return { ok: false, error: 'No segment IDs from schema found in data' };
+  return { ok: true, json: result, format: 'SAP Data' };
+}
+
+/**
+ * Uses schema field names as column headers when the CSV/flat file has no
+ * header row (i.e. the first line is all non-text tokens).  Falls back to
+ * normal CSV parsing when a header row is detected.
+ */
+function convertFlatDataWithSchema(
+  content: string,
+  schema: Record<string, unknown>,
+): ConversionResult {
+  const lines = content.split('\n').filter((l) => { const t = l.trim(); return t && !t.startsWith('#'); });
+  if (lines.length === 0) return { ok: false, error: 'Empty file' };
+
+  const delim = detectDelimiter(content);
+  const firstParts = lines[0].split(delim).map((p) => p.trim().replace(/^["']|["']$/g, ''));
+  const fieldNames = Object.keys(schema);
+
+  // If the first line looks like a header (contains non-numeric tokens), fall
+  // back to normal CSV parsing so we don't override real headers.
+  const firstLineIsHeader = firstParts.some((p) => p !== '' && isNaN(Number(p)));
+  if (firstLineIsHeader) return convertCSVData(content);
+
+  // No header row — use schema field names.
+  const parseValue = (v: string): unknown => {
+    if (v !== '' && /^-?\d+(\.\d+)?$/.test(v)) return Number(v);
+    if (v.toLowerCase() === 'true') return true;
+    if (v.toLowerCase() === 'false') return false;
+    return v;
+  };
+
+  const rows = lines.map((line) => {
+    const vals = line.split(delim).map((v) => v.trim().replace(/^["']|["']$/g, ''));
+    const row: Record<string, unknown> = {};
+    fieldNames.forEach((name, i) => {
+      row[name] = parseValue(vals[i] ?? '');
+    });
+    return row;
+  });
+
+  if (rows.length === 1) return { ok: true, json: rows[0], format: 'CSV' };
+  return { ok: true, json: rows, format: 'CSV' };
 }
 
 // ---------------------------------------------------------------------------

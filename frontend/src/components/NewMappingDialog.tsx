@@ -25,10 +25,12 @@ function readFileAsText(file: File): Promise<string> {
 }
 
 /** Loads a data file, auto-converts from XML / CSV / SAP / JSON to JSON, and
- *  returns the pretty-printed JSON string or throws an error string. */
-async function loadDataFile(file: File): Promise<{ json: string; format: string }> {
+ *  returns the pretty-printed JSON string or throws an error string.
+ *  An optional `schema` (already-parsed source schema JSON) guides field-name
+ *  resolution for non-self-describing formats. */
+async function loadDataFile(file: File, schema?: unknown): Promise<{ json: string; format: string }> {
   const content = await readFileAsText(file);
-  const result = convertDataFile(file.name, content);
+  const result = convertDataFile(file.name, content, schema);
   if (!result.ok) throw new Error(result.error);
   return { json: JSON.stringify(result.json, null, 2), format: result.format };
 }
@@ -80,7 +82,11 @@ export function NewMappingDialog({ onClose, onCreate }: NewMappingDialogProps) {
     key: keyof FieldError,
   ) {
     try {
-      const { json, format } = await loadDataFile(file);
+      // Pass the already-loaded source schema so non-JSON/non-XML formats can
+      // use its field names to map raw data values correctly.
+      let schema: unknown;
+      try { schema = sourceJson.trim() ? JSON.parse(sourceJson) : undefined; } catch { /* ignore */ }
+      const { json, format } = await loadDataFile(file, schema);
       setter(json);
       formatSetter(format);
       setErrors((prev) => ({ ...prev, [key]: undefined }));

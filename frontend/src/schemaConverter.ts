@@ -13,6 +13,10 @@
  *  - XML actual data (.xml)   → converts element hierarchy to a JSON object
  *  - CSV (.csv)               → first row (header) becomes a flat JSON object
  *                               with empty-string field values
+ *  - JSON schema files with the t2tedit segment schema format
+ *      `{ cfg: { separator-char, id-field-index }, segments: [ { id, children } ] }`
+ *      are converted to the internal `{ segId: { fieldName: default } }` format
+ *      with `_cfg` meta-key (separator, id-field-index) for data conversion.
  *  - SAP flat-file parser files (.p, .par, .txt, .csv with SAP field notation)
  *      Recognised patterns:
  *        1. SAP IDoc parser files (BEGIN_RECORD_SECTION / BEGIN_CONTROL_RECORD /
@@ -43,9 +47,9 @@ export type ConversionResult =
 export function convertSchemaFile(filename: string, content: string): ConversionResult {
   const ext = filename.split('.').pop()?.toLowerCase() ?? '';
 
-  // 1. Explicit JSON
+  // 1. Explicit JSON — parse and check for the t2tedit schema format before returning raw.
   if (ext === 'json') {
-    return convertJSON(content);
+    return convertJSONSchema(content);
   }
 
   // 2. XSD
@@ -56,7 +60,7 @@ export function convertSchemaFile(filename: string, content: string): Conversion
   // 3. Try JSON anyway (no extension or .txt that happens to be JSON)
   const jsonTry = tryJSON(content);
   if (jsonTry !== null) {
-    return { ok: true, json: jsonTry, format: 'JSON' };
+    return convertT2TEditSchema(jsonTry) ?? { ok: true, json: jsonTry, format: 'JSON' };
   }
 
   // 4. SAP IDoc parser format (BEGIN_RECORD_SECTION / BEGIN_CONTROL_RECORD)
@@ -79,13 +83,115 @@ export function convertSchemaFile(filename: string, content: string): Conversion
 }
 
 // ---------------------------------------------------------------------------
-// JSON
+// JSON — with t2tedit schema format detection
 // ---------------------------------------------------------------------------
 
-function convertJSON(content: string): ConversionResult {
+/**
+ * Parses a JSON schema file.  If the JSON has the t2tedit segment schema format
+ * (`{ cfg, structure, segments }`) it is converted to the internal segmented
+ * representation.  Otherwise the raw JSON is returned unchanged.
+ */
+function convertJSONSchema(content: string): ConversionResult {
   const json = tryJSON(content);
   if (json === null) return { ok: false, error: 'Invalid JSON' };
-  return { ok: true, json, format: 'JSON' };
+  return convertT2TEditSchema(json) ?? { ok: true, json, format: 'JSON' };
+}
+
+/**
+ * Detects and converts the t2tedit segment schema format:
+ * ```json
+ * { "cfg": { "separator-char": "@", "id-field-index": 0, … },
+ *   "structure": { … },
+ *   "segments": [ { "id": "660", "children": [ { "id": "Satzart", "format": "an3" }, … ] }, … ] }
+ * ```
+ * Returns `null` when the JSON does not match this format (allowing callers to
+ * fall back to the raw JSON pass-through).
+ *
+ * The result uses the internal segmented schema representation
+ * `{ segId: { fieldName: defaultValue } }`.  A `_cfg` meta-key is added with
+ * the separator character and id-field-index so that {@link convertDataWithSchema}
+ * can parse matching data files correctly without needing to auto-detect the
+ * delimiter.
+ */
+function convertT2TEditSchema(json: unknown): ConversionResult | null {
+  if (!json || typeof json !== 'object' || Array.isArray(json)) return null;
+
+  const obj = json as Record<string, unknown>;
+
+  // Must have a `segments` array whose items have both `id` and `children`
+  if (!Array.isArray(obj['segments'])) return null;
+  const segs = obj['segments'] as unknown[];
+  if (
+    segs.length === 0 ||
+    !segs.every(
+      (s) =>
+        s !== null &&
+        typeof s === 'object' &&
+        !Array.isArray(s) &&
+        typeof (s as Record<string, unknown>)['id'] === 'string' &&
+        Array.isArray((s as Record<string, unknown>)['children']),
+    )
+  ) {
+    return null;
+  }
+
+  const result: Record<string, unknown> = {};
+
+  // Extract cfg metadata
+  const cfgRaw = obj['cfg'];
+  const cfg =
+    cfgRaw !== null && typeof cfgRaw === 'object' && !Array.isArray(cfgRaw)
+      ? (cfgRaw as Record<string, unknown>)
+      : {};
+
+  const separatorChar =
+    typeof cfg['separator-char'] === 'string' && cfg['separator-char'].length > 0
+      ? cfg['separator-char']
+      : null;
+
+  const idFieldIndex =
+    typeof cfg['id-field-index'] === 'number' ? (cfg['id-field-index'] as number) : 0;
+
+  // Convert each segment to { fieldName: defaultValue }
+  for (const seg of segs) {
+    const s = seg as Record<string, unknown>;
+    const segId = s['id'] as string;
+    const children = s['children'] as unknown[];
+    const fields: Record<string, unknown> = {};
+
+    for (const child of children) {
+      if (!child || typeof child !== 'object' || Array.isArray(child)) continue;
+      const c = child as Record<string, unknown>;
+      const fieldId = c['id'];
+      if (typeof fieldId !== 'string' || !fieldId) continue;
+      const format = typeof c['format'] === 'string' ? c['format'] : '';
+      fields[fieldId] = t2tFormatDefault(format);
+    }
+
+    result[segId] = fields;
+  }
+
+  if (Object.keys(result).length === 0) return null;
+
+  // Store cfg as a meta-key for data conversion
+  result['_cfg'] = {
+    separator: separatorChar,
+    idFieldIndex,
+  };
+
+  return { ok: true, json: result, format: 'T2T Schema' };
+}
+
+/** Returns a suitable default value for a t2tedit field format string.
+ *  Format strings follow the pattern: `an3`, `n8`, `an..10`, `n..2`, etc.
+ *  `an` prefix → alphanumeric (string), `n` prefix → numeric.
+ */
+function t2tFormatDefault(format: string): unknown {
+  if (!format) return '';
+  const lf = format.toLowerCase().trim();
+  // Numeric-only formats: 'n' followed by digits or '..' (not 'an' / alphanumeric)
+  if (/^n(?:\d|\.\.)/.test(lf)) return 0;
+  return '';
 }
 
 function tryJSON(content: string): unknown | null {
@@ -641,7 +747,11 @@ export function convertDataFile(filename: string, content: string, schema?: unkn
   const ext = filename.split('.').pop()?.toLowerCase() ?? '';
 
   // 1. Explicit JSON
-  if (ext === 'json') return convertJSON(content);
+  if (ext === 'json') {
+    const json = tryJSON(content);
+    if (json === null) return { ok: false, error: 'Invalid JSON' };
+    return { ok: true, json, format: 'JSON' };
+  }
 
   // 2. XML actual data (not XSD schema)
   if (
@@ -686,9 +796,12 @@ export function convertDataFile(filename: string, content: string, schema?: unkn
  *
  * 2. **Segmented schema** — schema has segment-ID keys whose values are field
  *    objects (e.g. `{ "660": { "Satzart":"", "NL-Nummer":"" }, "661": {...} }`).
- *    Each data line whose first delimited token is a known segment ID is parsed
- *    by mapping subsequent tokens to that segment's field names in order.
- *    Multiple lines with the same segment ID become an array.
+ *    Each data line whose token at `id-field-index` is a known segment ID is
+ *    parsed by mapping the remaining tokens to that segment's field names in
+ *    order.  Multiple lines with the same segment ID become an array.
+ *    When a `_cfg` meta-key is present (produced by {@link convertT2TEditSchema})
+ *    the configured separator character and id-field-index are used instead of
+ *    auto-detection.
  *
  * 3. **Flat schema** — schema is a plain field→value object
  *    (e.g. `{ "Name":"", "Age":0, "City":"" }`).
@@ -715,6 +828,25 @@ function convertDataWithSchema(content: string, schema: unknown): ConversionResu
     // Fall through on failure (data may be delimited instead of fixed-length)
   }
 
+  // Extract optional _cfg metadata (from t2tedit schema format)
+  const cfgMeta =
+    '_cfg' in schemaObj &&
+    schemaObj['_cfg'] !== null &&
+    typeof schemaObj['_cfg'] === 'object' &&
+    !Array.isArray(schemaObj['_cfg'])
+      ? (schemaObj['_cfg'] as Record<string, unknown>)
+      : null;
+
+  const configuredSeparator =
+    cfgMeta && typeof cfgMeta['separator'] === 'string' && (cfgMeta['separator'] as string).length > 0
+      ? (cfgMeta['separator'] as string)
+      : null;
+
+  const idFieldIndex =
+    cfgMeta && typeof cfgMeta['idFieldIndex'] === 'number'
+      ? (cfgMeta['idFieldIndex'] as number)
+      : 0;
+
   const schemaKeys = Object.keys(filteredSchema);
   if (schemaKeys.length === 0) return { ok: false, error: 'Empty schema' };
 
@@ -730,11 +862,13 @@ function convertDataWithSchema(content: string, schema: unknown): ConversionResu
     return convertSegmentedDataWithSchema(
       content,
       filteredSchema as Record<string, Record<string, unknown>>,
+      configuredSeparator,
+      idFieldIndex,
     );
   }
 
   // 3. Flat schema — use field names as fallback column headers for CSV-style data.
-  return convertFlatDataWithSchema(content, filteredSchema);
+  return convertFlatDataWithSchema(content, filteredSchema, configuredSeparator);
 }
 
 /**
@@ -807,19 +941,29 @@ function convertIdocDataWithPositions(
 }
 
 /**
- * Parses delimited data whose first column is a segment ID matching a key in
- * `schema`.  Each matched line is mapped to that segment's field names.
+ * Parses delimited data whose token at `idFieldIndex` is a segment ID matching
+ * a key in `schema`.  Each matched line is mapped to that segment's field names.
+ *
+ * @param separator     Explicit delimiter character; auto-detected when null.
+ * @param idFieldIndex  Zero-based index of the token that identifies the segment.
  */
 function convertSegmentedDataWithSchema(
   content: string,
   schema: Record<string, Record<string, unknown>>,
+  separator: string | null = null,
+  idFieldIndex = 0,
 ): ConversionResult {
-  const delim = detectDelimiter(content);
+  const delim = separator ?? detectDelimiter(content);
   const result: Record<string, unknown> = {};
   let matched = 0;
 
-  const parseValue = (v: string): unknown => {
-    if (v !== '' && /^-?\d+(\.\d+)?$/.test(v)) return Number(v);
+  const parseValue = (v: string, schemaDefault: unknown): unknown => {
+    if (typeof schemaDefault === 'number') {
+      // Only coerce to number when there are no leading zeros (e.g. "009999"
+      // must stay as a string even though the schema field is numeric).
+      if (v !== '' && /^-?(?:0|[1-9]\d*)(\.\d+)?$/.test(v)) return Number(v);
+      return v;
+    }
     if (v.toLowerCase() === 'true') return true;
     if (v.toLowerCase() === 'false') return false;
     return v;
@@ -830,14 +974,14 @@ function convertSegmentedDataWithSchema(
     if (!line || line.startsWith('#') || line.startsWith('/')) continue;
 
     const parts = line.split(delim).map((p) => p.trim());
-    const segId = parts[0];
+    const segId = parts[idFieldIndex];
     if (!segId || !(segId in schema)) continue;
 
     matched++;
     const fieldNames = Object.keys(schema[segId]);
     const row: Record<string, unknown> = {};
     fieldNames.forEach((name, i) => {
-      row[name] = parseValue(parts[i] ?? '');
+      row[name] = parseValue(parts[i] ?? '', schema[segId][name]);
     });
 
     if (!(segId in result)) {
@@ -850,22 +994,25 @@ function convertSegmentedDataWithSchema(
   }
 
   if (matched === 0) return { ok: false, error: 'No segment IDs from schema found in data' };
-  return { ok: true, json: result, format: 'SAP Data' };
+  return { ok: true, json: result, format: 'T2T Data' };
 }
 
 /**
  * Uses schema field names as column headers when the CSV/flat file has no
  * header row (i.e. the first line is all non-text tokens).  Falls back to
  * normal CSV parsing when a header row is detected.
+ *
+ * @param separator  Explicit delimiter character; auto-detected when null.
  */
 function convertFlatDataWithSchema(
   content: string,
   schema: Record<string, unknown>,
+  separator: string | null = null,
 ): ConversionResult {
   const lines = content.split('\n').filter((l) => { const t = l.trim(); return t && !t.startsWith('#'); });
   if (lines.length === 0) return { ok: false, error: 'Empty file' };
 
-  const delim = detectDelimiter(content);
+  const delim = separator ?? detectDelimiter(content);
   const firstParts = lines[0].split(delim).map((p) => p.trim().replace(/^["']|["']$/g, ''));
   const fieldNames = Object.keys(schema);
 

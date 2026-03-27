@@ -4,6 +4,7 @@ import type { Mapping } from './types';
 import { MappingList } from './components/MappingList';
 import { MappingEditor } from './components/MappingEditor';
 import { NewMappingDialog } from './components/NewMappingDialog';
+import { HelpDialog } from './components/HelpDialog';
 import { mappingToGroovyFile, parseGroovyFile, downloadTextFile, mappingFilename } from './mappingFile';
 import {
   SA660_SOURCE,
@@ -22,6 +23,7 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [showNewDialog, setShowNewDialog] = useState(false);
+  const [showHelpDialog, setShowHelpDialog] = useState(false);
   const [fileMenuOpen, setFileMenuOpen] = useState(false);
   const fileMenuRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -201,14 +203,25 @@ function App() {
           />
         </div>
 
-        <div className="groovy-status">
-          {groovyStatus === null ? (
-            <span className="groovy-loading">Checking Groovy…</span>
-          ) : groovyStatus.available ? (
-            <span className="groovy-ok">● Groovy {groovyStatus.version ?? ''}</span>
-          ) : (
-            <span className="groovy-unavailable">● Groovy unavailable</span>
-          )}
+        <div className="header-right">
+          <div className="groovy-status">
+            {groovyStatus === null ? (
+              <span className="groovy-loading">Checking Groovy…</span>
+            ) : groovyStatus.available ? (
+              <span className="groovy-ok">● Groovy {groovyStatus.version ?? ''}</span>
+            ) : (
+              <span className="groovy-unavailable">● Groovy unavailable</span>
+            )}
+          </div>
+
+          <button
+            className="btn help-btn"
+            onClick={() => setShowHelpDialog(true)}
+            aria-label="Hilfe öffnen"
+            title="Hilfe"
+          >
+            ❓ Hilfe
+          </button>
         </div>
       </header>
 
@@ -250,6 +263,8 @@ function App() {
           onCreate={handleCreateWithSchemas}
         />
       )}
+
+      {showHelpDialog && <HelpDialog onClose={() => setShowHelpDialog(false)} />}
     </div>
   );
 }

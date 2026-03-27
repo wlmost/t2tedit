@@ -1,6 +1,7 @@
 package parser_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/wlmost/t2tedit/internal/parser"
@@ -139,6 +140,51 @@ func TestParseSchema_NestedObject(t *testing.T) {
 	}
 	if userField.Children[0].Path != "user.firstName" {
 		t.Errorf("expected path user.firstName, got %s", userField.Children[0].Path)
+	}
+}
+
+// TestParseSchema_MetaKeysSkipped verifies that top-level keys starting with "_"
+// (e.g. _positions, _cfg) are excluded from the schema tree so that internal
+// IDoc meta-data is not exposed to the user in the Mapping tab.
+func TestParseSchema_MetaKeysSkipped(t *testing.T) {
+	data := map[string]interface{}{
+		"EDI_DC40": map[string]interface{}{
+			"TABNAM": "",
+			"MANDT":  "",
+		},
+		"E1EDL20": map[string]interface{}{
+			"VBELN": "",
+		},
+		"_positions": map[string]interface{}{
+			"EDI_DC40": map[string]interface{}{
+				"TABNAM": []interface{}{float64(1), float64(10)},
+			},
+			"E1EDL20": map[string]interface{}{
+				"SEGNAM": []interface{}{float64(1), float64(30)},
+				"VBELN":  []interface{}{float64(64), float64(73)},
+			},
+		},
+	}
+	fields := parser.ParseSchema(data)
+
+	for _, f := range fields {
+		if strings.HasPrefix(f.Name, "_") {
+			t.Errorf("meta-key %q must not appear in schema tree", f.Name)
+		}
+	}
+
+	names := map[string]bool{}
+	for _, f := range fields {
+		names[f.Name] = true
+	}
+	if !names["EDI_DC40"] {
+		t.Error("expected EDI_DC40 to appear in schema tree")
+	}
+	if !names["E1EDL20"] {
+		t.Error("expected E1EDL20 to appear in schema tree")
+	}
+	if names["_positions"] {
+		t.Error("_positions must not appear in schema tree")
 	}
 }
 

@@ -17,15 +17,34 @@ function generateId(): string {
   return `rule-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
+/**
+ * Recursively removes any key starting with "_" from a plain object.
+ * These are internal meta-keys (e.g. _positions, _cfg) used by the
+ * data-conversion layer and must not be displayed to the user.
+ */
+function stripMetaKeys(value: unknown): unknown {
+  if (value === null || typeof value !== 'object') return value;
+  if (Array.isArray(value)) return value.map(stripMetaKeys);
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+    if (!k.startsWith('_')) out[k] = stripMetaKeys(v);
+  }
+  return out;
+}
+
+function schemaToDisplayJson(schema: unknown): string {
+  return JSON.stringify(stripMetaKeys(schema), null, 2);
+}
+
 export function MappingEditor({ mapping, onSave }: MappingEditorProps) {
   const [draft, setDraft] = useState<Mapping>(mapping);
   const [activeTab, setActiveTab] = useState<Tab>('script');
 
   const [sourceJson, setSourceJson] = useState(
-    mapping.sourceSchema ? JSON.stringify(mapping.sourceSchema, null, 2) : ''
+    mapping.sourceSchema ? schemaToDisplayJson(mapping.sourceSchema) : ''
   );
   const [targetJson, setTargetJson] = useState(
-    mapping.targetSchema ? JSON.stringify(mapping.targetSchema, null, 2) : ''
+    mapping.targetSchema ? schemaToDisplayJson(mapping.targetSchema) : ''
   );
   const [sourceFields, setSourceFields] = useState<SchemaField[]>([]);
   const [targetFields, setTargetFields] = useState<SchemaField[]>([]);
@@ -59,8 +78,8 @@ export function MappingEditor({ mapping, onSave }: MappingEditorProps) {
   if (mapping.id !== lastMappingId) {
     setLastMappingId(mapping.id);
     setDraft(mapping);
-    setSourceJson(mapping.sourceSchema ? JSON.stringify(mapping.sourceSchema, null, 2) : '');
-    setTargetJson(mapping.targetSchema ? JSON.stringify(mapping.targetSchema, null, 2) : '');
+    setSourceJson(mapping.sourceSchema ? schemaToDisplayJson(mapping.sourceSchema) : '');
+    setTargetJson(mapping.targetSchema ? schemaToDisplayJson(mapping.targetSchema) : '');
     setSourceFields([]);
     setTargetFields([]);
     setSelectedSource(null);

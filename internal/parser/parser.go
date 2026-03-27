@@ -28,6 +28,11 @@ func parseValue(data interface{}, name, parentPath string) []models.SchemaField 
 			Type: "object",
 		}
 		for key, val := range v {
+			// Skip internal meta-keys (e.g. _positions, _cfg) — they are used
+			// by the data-conversion layer and must not appear in the schema tree.
+			if strings.HasPrefix(key, "_") {
+				continue
+			}
 			children := parseValue(val, key, path)
 			field.Children = append(field.Children, children...)
 		}

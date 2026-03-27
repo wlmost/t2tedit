@@ -281,6 +281,163 @@ const HELP_SECTIONS: HelpSection[] = [
     ],
   },
   {
+    id: 'jsonpath-cheatsheet',
+    title: '🔍 JSONPath Spickzettel',
+    content: [
+      'JSONPath-Ausdrücke werden in t2tedit verwendet, um Felder in Quell- und Zieldaten zu adressieren. t2tedit nutzt die vereinfachte Punkt-Notation ohne führendes „$.".',
+    ],
+    subsections: [
+      {
+        title: 'Grundlegende Syntax',
+        content: [
+          'feldname – Direktes Feld auf oberster Ebene. Beispiel: orderId',
+          'elternteil.kind – Verschachteltes Feld. Beispiel: header.orderId',
+          'array.0.feld – Element an Index 0 eines Arrays. Beispiel: items.0.price',
+          'a.b.c – Beliebig tief verschachtelt. Beispiel: order.customer.address.city',
+        ],
+      },
+      {
+        title: 'Vollständige JSONPath-Syntax (zur Referenz)',
+        content: [
+          '$ – Wurzel des Dokuments',
+          '$.store.book[0].title – Erstes Buch im Array (eckige Klammern + Null-basierter Index)',
+          '$.store.book[*].author – Alle Autoren (Wildcard *)',
+          '$.store.book[-1] – Letztes Element',
+          '$.store.book[0,1] – Erstes und zweites Element',
+          '$.store.book[0:2] – Slice: Indizes 0 bis 1',
+          '$..author – Rekursive Suche nach „author" auf jeder Ebene (Tiefensuche)',
+          '$.store.* – Alle direkten Kinder von „store"',
+          '$.store.book[?(@.price < 10)] – Filter: Bücher mit Preis < 10',
+          '$.store.book[?(@.author == "Tolkien")] – Filter: Bücher von Tolkien',
+        ],
+      },
+      {
+        title: 'Operatoren in Filtern',
+        content: [
+          '== – Gleich',
+          '!= – Ungleich',
+          '< / <= – Kleiner / Kleiner-gleich',
+          '> / >= – Größer / Größer-gleich',
+          '=~ – Regulärer Ausdruck (z. B. @.name =~ /Max.*/)',
+          'in – Enthaltensein (z. B. @.size in ["S", "M", "L"])',
+          '&& / || – Logisches Und / Oder',
+          '! – Negation',
+        ],
+      },
+      {
+        title: 'Praktische Beispiele',
+        content: [
+          'order.id – Feld „id" im Objekt „order"',
+          'lines.0.quantity – Erstes Element des Arrays „lines", Feld „quantity"',
+          'customer.address.zip – Tief verschachteltes Feld',
+          'EDI_DC40.DOCNUM – SAP-IDoc-Steuerfeld DOCNUM',
+          'E1EDL20.0.VBELN – Erstes E1EDL20-Segment, Feld VBELN',
+        ],
+      },
+    ],
+  },
+  {
+    id: 'groovy-cheatsheet',
+    title: '🐍 Groovy Spickzettel',
+    content: [
+      'Groovy ist eine dynamische JVM-Sprache mit kompakter Syntax. Im Skript-Tab stehen die Variablen source (Eingabe-Map) und target {} (Ausgabe-Builder) zur Verfügung.',
+    ],
+    subsections: [
+      {
+        title: 'Zugriff auf Quelldaten',
+        content: [
+          'source.feldname – Feldzugriff per Punkt-Notation',
+          'source["feldname"] – Feldzugriff per String-Key',
+          'source.a?.b?.c – Null-sichere Navigation (gibt null zurück statt Exception)',
+          'source.preis as BigDecimal – Typkonvertierung',
+          'source.liste?.size() – Länge einer Liste (null-sicher)',
+        ],
+      },
+      {
+        title: 'Ausgabe mit target {}',
+        content: [
+          'target { feldname wert } – Einfaches Feld setzen',
+          'target { orderId source.id } – Quellwert direkt übertragen',
+          'target { fullName "${source.firstName} ${source.lastName}" } – GString-Interpolation',
+          'target { price source.netPrice * 1.19 } – Berechneter Wert',
+          'target { status "AKTIV" } – Konstanter Wert',
+        ],
+      },
+      {
+        title: 'Strings',
+        content: [
+          '"text ${variable}" – GString (interpolierter String)',
+          '\'text\' – Einfacher String (keine Interpolation)',
+          'str.toUpperCase() – Groß schreiben',
+          'str.toLowerCase() – Klein schreiben',
+          'str.trim() – Leerzeichen entfernen',
+          'str.replace("-", "") – Zeichen ersetzen',
+          'str.replaceAll(/\\D/, "") – Regex-Ersetzung (nur Ziffern behalten)',
+          'str.substring(0, 8) – Teilstring',
+          'str.padLeft(10, "0") – Linksseitig mit 0 auffüllen',
+          'str?.isEmpty() – Null-sicher auf leer prüfen',
+        ],
+      },
+      {
+        title: 'Zahlen und Berechnungen',
+        content: [
+          'source.menge as Integer – In Integer konvertieren',
+          'source.preis as BigDecimal – In Dezimalzahl konvertieren',
+          'Math.round(x * 100) / 100 – Auf 2 Stellen runden',
+          'x.abs() – Absolutwert',
+          '[a, b].max() – Maximum',
+          '[a, b].min() – Minimum',
+        ],
+      },
+      {
+        title: 'Datumsformatierung',
+        content: [
+          'import java.text.SimpleDateFormat',
+          'new SimpleDateFormat("yyyyMMdd").format(new Date()) – Heutiges Datum formatieren',
+          'source.datum?.replaceAll("-", "") – ISO-Datum „2024-03-15" → „20240315"',
+          'new SimpleDateFormat("yyyy-MM-dd").parse(source.datum) – String zu Date parsen',
+        ],
+      },
+      {
+        title: 'Bedingte Logik',
+        content: [
+          'source.flag ? "JA" : "NEIN" – Ternärer Operator',
+          'source.wert ?: "standard" – Elvis-Operator (Fallback bei null/false)',
+          'if (source.x > 0) { ... } else { ... } – Klassisches if/else',
+          'switch (source.code) { case "A": return 1; default: return 0 } – Switch',
+        ],
+      },
+      {
+        title: 'Listen und Maps',
+        content: [
+          '[1, 2, 3] – Liste',
+          '[name: "Max", age: 30] – Map (Groovy-Syntax)',
+          'liste.each { item -> ... } – Iteration',
+          'liste.collect { it.feld } – Liste transformieren (map)',
+          'liste.findAll { it.aktiv } – Filtern',
+          'liste.find { it.id == "X" } – Erstes passendes Element',
+          'liste.join(", ") – Zu String zusammenfügen',
+          'map.containsKey("key") – Schlüssel prüfen',
+          'map.get("key", "default") – Mit Fallback lesen',
+        ],
+      },
+      {
+        title: 'SAP-IDoc-Iteration',
+        content: [
+          'source.forEach("E1EDL20") { seg -> ... } – Alle Segmente eines Typs durchlaufen',
+          'Innerhalb des Closures: seg.VBELN – Feld aus dem Segment lesen',
+          'Beispiel:',
+          '  source.forEach("E1EDL20") { seg ->',
+          '    target {',
+          '      lieferung seg.VBELN',
+          '      datum seg.WADAT_IST',
+          '    }',
+          '  }',
+        ],
+      },
+    ],
+  },
+  {
     id: 'tips',
     title: '🔧 Tipps & Hinweise',
     content: [

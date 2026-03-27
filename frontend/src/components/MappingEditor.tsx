@@ -37,6 +37,48 @@ function schemaToDisplayJson(schema: unknown): string {
   return JSON.stringify(stripMetaKeys(schema), null, 2);
 }
 
+/**
+ * Recursively converts a (meta-stripped) target schema object to a Groovy DSL
+ * template string that can be used as a scaffold inside a `return target { … }` block.
+ */
+function schemaValueToGroovy(value: unknown, indent: number): string {
+  const pad = '  '.repeat(indent);
+  if (value === null || typeof value !== 'object') {
+    // leaf → empty string placeholder
+    return "('')";
+  }
+  if (Array.isArray(value)) {
+    // Show the structure of the first element, if any
+    if (value.length > 0) return schemaValueToGroovy(value[0], indent);
+    return "('')";
+  }
+  const entries = Object.entries(value as Record<string, unknown>);
+  if (entries.length === 0) return '{}';
+  const lines = entries.map(([k, v]) => {
+    const child = schemaValueToGroovy(v, indent + 1);
+    return `${pad}  ${k} ${child}`;
+  });
+  return `{\n${lines.join('\n')}\n${pad}}`;
+}
+
+/**
+ * Converts a target JSON schema (raw, may contain meta keys) into a Groovy
+ * DSL template scaffold string, ready to paste into the script editor.
+ */
+function targetSchemaToGroovyTemplate(schema: unknown): string {
+  const clean = stripMetaKeys(schema) as Record<string, unknown>;
+  if (!clean || typeof clean !== 'object' || Array.isArray(clean)) return '';
+  const entries = Object.entries(clean);
+  if (entries.length === 0) return '';
+  const body = entries
+    .map(([k, v]) => {
+      const child = schemaValueToGroovy(v, 1);
+      return `  ${k} ${child}`;
+    })
+    .join('\n');
+  return `return target {\n${body}\n}`;
+}
+
 export function MappingEditor({ mapping, onSave }: MappingEditorProps) {
   const [draft, setDraft] = useState<Mapping>(mapping);
   const [activeTab, setActiveTab] = useState<Tab>('script');
@@ -336,7 +378,10 @@ export function MappingEditor({ mapping, onSave }: MappingEditorProps) {
               value={groovyScript}
               onChange={(e) => setGroovyScript(e.target.value)}
               spellCheck={false}
-              placeholder={`// Write a Groovy script that transforms source into the target format.\n// The 'source' binding contains the full source JSON.\n// Segments are accessed with quoted keys, e.g. source.'660'.fieldName\n// Use the target{} builder DSL for ySE-compatible output (no array literals).\n\nreturn target {\n  targetField(source.'660'.sourceField)\n}`}
+              placeholder={
+                (draft.targetSchema && targetSchemaToGroovyTemplate(draft.targetSchema)) ||
+                `// Write a Groovy script that transforms source into the target format.\n// The 'source' binding contains the full source JSON.\n// Segments are accessed with quoted keys, e.g. source.'660'.fieldName\n// Use the target{} builder DSL for ySE-compatible output (no array literals).\n\nreturn target {\n  targetField(source.'660'.sourceField)\n}`
+              }
             />
           </div>
 

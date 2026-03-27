@@ -81,6 +81,10 @@ export const SA660_SOURCE = {
 /**
  * SAP IDoc DELVRY03 – EDI_DC40 control record target structure.
  * Field names and descriptions are taken from DELVRY03.txt.
+ *
+ * `_positions` contains the standard SAP fixed-width character ranges (1-indexed)
+ * for the EDI_DC40 control record, enabling the Groovy-script result to be
+ * rendered as a proper IDoc flat-file line in the "Resulting Target Format" panel.
  */
 export const IDOC_DC40_TARGET = {
   EDI_DC40: {
@@ -120,6 +124,50 @@ export const IDOC_DC40_TARGET = {
     REFMES: '', // Nachricht (EDI Message)
     ARCKEY: '', // Schlüssel des externen Nachrichtenarchivs
     SERIAL: '', // Serialisierung
+  },
+  // Standard SAP character positions (1-indexed) for the EDI_DC40 control record,
+  // derived from the SAP EDIDC table structure (ABAP dictionary).
+  // Ranges are non-overlapping and contiguous.
+  // Total fixed-width line length: 652 characters (end of SERIAL field).
+  _positions: {
+    EDI_DC40: {
+      TABNAM: [1,   10]  as [number, number], // CHAR 10
+      MANDT:  [11,  13]  as [number, number], // CLNT  3
+      DOCNUM: [14,  29]  as [number, number], // NUMC 16
+      DOCREL: [30,  34]  as [number, number], // CHAR  5
+      STATUS: [35,  36]  as [number, number], // CHAR  2
+      DIRECT: [37,  37]  as [number, number], // CHAR  1
+      OUTMOD: [38,  38]  as [number, number], // CHAR  1
+      EXPRSS: [39,  39]  as [number, number], // CHAR  1
+      TEST:   [40,  40]  as [number, number], // CHAR  1
+      IDOCTYP:[41,  70]  as [number, number], // CHAR 30
+      CIMTYP: [71,  100] as [number, number], // CHAR 30
+      MESTYP: [101, 130] as [number, number], // CHAR 30
+      MESCOD: [131, 133] as [number, number], // CHAR  3
+      MESFCT: [134, 135] as [number, number], // CHAR  2
+      STD:    [136, 138] as [number, number], // CHAR  3
+      STDVRS: [139, 144] as [number, number], // CHAR  6
+      STDMES: [145, 174] as [number, number], // CHAR 30
+      SNDPOR: [175, 184] as [number, number], // CHAR 10
+      SNDPRT: [185, 186] as [number, number], // CHAR  2
+      SNDPFC: [187, 188] as [number, number], // CHAR  2
+      SNDPRN: [189, 198] as [number, number], // CHAR 10
+      SNDSAD: [199, 219] as [number, number], // CHAR 21
+      SNDLAD: [220, 289] as [number, number], // CHAR 70
+      RCVPOR: [290, 299] as [number, number], // CHAR 10
+      RCVPRT: [300, 301] as [number, number], // CHAR  2
+      RCVPFC: [302, 303] as [number, number], // CHAR  2
+      RCVPRN: [304, 313] as [number, number], // CHAR 10
+      RCVSAD: [314, 334] as [number, number], // CHAR 21
+      RCVLAD: [335, 404] as [number, number], // CHAR 70
+      CREDAT: [405, 412] as [number, number], // DATS  8
+      CRETIM: [413, 418] as [number, number], // TIMS  6
+      REFINT: [419, 466] as [number, number], // CHAR 48
+      REFGRP: [467, 514] as [number, number], // CHAR 48
+      REFMES: [515, 562] as [number, number], // CHAR 48
+      ARCKEY: [563, 632] as [number, number], // CHAR 70
+      SERIAL: [633, 652] as [number, number], // CHAR 20
+    },
   },
 };
 

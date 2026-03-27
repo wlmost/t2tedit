@@ -71,6 +71,10 @@ function extractPositions(
  * its character range (1-indexed, as stored in the parser file).
  * Values are left-aligned within their field width; values longer than their
  * defined range are truncated.
+ *
+ * Note: padding is calculated by JavaScript string length (UTF-16 code units).
+ * SAP IDoc flat-file data is expected to contain only ASCII / single-byte
+ * characters, which aligns with this assumption.
  */
 function buildFixedWidthLine(
   fields: Record<string, unknown>,

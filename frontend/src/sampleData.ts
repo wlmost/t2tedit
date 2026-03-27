@@ -81,6 +81,10 @@ export const SA660_SOURCE = {
 /**
  * SAP IDoc DELVRY03 – EDI_DC40 control record target structure.
  * Field names and descriptions are taken from DELVRY03.txt.
+ *
+ * `_positions` contains the standard SAP fixed-width character ranges (1-indexed)
+ * for the EDI_DC40 control record, enabling the Groovy-script result to be
+ * rendered as a proper IDoc flat-file line in the "Resulting Target Format" panel.
  */
 export const IDOC_DC40_TARGET = {
   EDI_DC40: {
@@ -120,6 +124,49 @@ export const IDOC_DC40_TARGET = {
     REFMES: '', // Nachricht (EDI Message)
     ARCKEY: '', // Schlüssel des externen Nachrichtenarchivs
     SERIAL: '', // Serialisierung
+  },
+  // Standard SAP character positions (1-indexed) for the EDI_DC40 control record.
+  // Ranges are non-overlapping and contiguous per the SAP IDoc standard.
+  // Total fixed-width line length: 352 characters (end of SERIAL field).
+  _positions: {
+    EDI_DC40: {
+      TABNAM: [1, 10] as [number, number],
+      MANDT:  [11, 13] as [number, number],
+      DOCNUM: [14, 29] as [number, number],
+      DOCREL: [30, 34] as [number, number],
+      STATUS: [35, 36] as [number, number],
+      DIRECT: [37, 37] as [number, number],
+      OUTMOD: [38, 38] as [number, number],
+      EXPRSS: [39, 39] as [number, number],
+      TEST:   [40, 40] as [number, number],
+      IDOCTYP:[41, 50] as [number, number],
+      CIMTYP: [51, 58] as [number, number],
+      MESTYP: [59, 66] as [number, number],
+      MESCOD: [67, 69] as [number, number],
+      MESFCT: [70, 71] as [number, number],
+      STD:    [72, 73] as [number, number],
+      STDVRS: [74, 79] as [number, number],
+      STDMES: [80, 86] as [number, number],
+      SNDPOR: [87, 96] as [number, number],
+      SNDPRT: [97, 98] as [number, number],
+      SNDPFC: [99, 100] as [number, number],
+      SNDPRN: [101, 110] as [number, number],
+      SNDSAD: [111, 131] as [number, number],
+      SNDLAD: [132, 161] as [number, number],
+      RCVPOR: [162, 171] as [number, number],
+      RCVPRT: [172, 173] as [number, number],
+      RCVPFC: [174, 175] as [number, number],
+      RCVPRN: [176, 185] as [number, number],
+      RCVSAD: [186, 206] as [number, number],
+      RCVLAD: [207, 236] as [number, number],
+      CREDAT: [237, 244] as [number, number],
+      CRETIM: [245, 250] as [number, number],
+      REFINT: [251, 264] as [number, number],
+      REFGRP: [265, 278] as [number, number],
+      REFMES: [279, 292] as [number, number],
+      ARCKEY: [293, 342] as [number, number],
+      SERIAL: [343, 352] as [number, number],
+    },
   },
 };
 

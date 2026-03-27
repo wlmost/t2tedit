@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 
 interface HelpSection {
   id: string;
@@ -470,6 +470,39 @@ function sectionMatchesQuery(sec: HelpSection, q: string): boolean {
 export function HelpDialog({ onClose }: HelpDialogProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSection, setActiveSection] = useState<string>(HELP_SECTIONS[0].id);
+  const [pos, setPos] = useState(() => ({
+    x: Math.max(20, Math.floor((window.innerWidth - 860) / 2)),
+    y: 80,
+  }));
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // Clean up any lingering drag listeners when the dialog is closed/unmounted
+  useEffect(() => {
+    return () => {
+      // no-op: drag listeners are self-cleaning via onUp closure
+    };
+  }, []);
+
+  function handleHeaderMouseDown(e: React.MouseEvent<HTMLDivElement>) {
+    if ((e.target as HTMLElement).closest('button')) return; // don't drag on close button
+    e.preventDefault();
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const panelX = pos.x;
+    const panelY = pos.y;
+    function onMove(ev: MouseEvent) {
+      setPos({
+        x: Math.max(0, panelX + ev.clientX - startX),
+        y: Math.max(0, panelY + ev.clientY - startY),
+      });
+    }
+    function onUp() {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    }
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }
 
   const filteredSections = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -519,73 +552,81 @@ export function HelpDialog({ onClose }: HelpDialogProps) {
   }
 
   return (
-    <div className="dialog-overlay" role="dialog" aria-modal="true" aria-label="Hilfe">
-      <div className="dialog help-dialog">
-        <div className="dialog-header">
-          <span className="dialog-title">❓ Hilfe — Mapping Editor</span>
-          <button className="dialog-close" onClick={onClose} aria-label="Schließen">
-            ✕
-          </button>
-        </div>
+    <div
+      ref={panelRef}
+      className="help-float"
+      role="dialog"
+      aria-modal="false"
+      aria-label="Hilfe"
+      style={{ left: pos.x, top: pos.y }}
+    >
+      <div
+        className="dialog-header help-float-header"
+        onMouseDown={handleHeaderMouseDown}
+      >
+        <span className="dialog-title">❓ Hilfe — Mapping Editor</span>
+        <button className="dialog-close" onClick={onClose} aria-label="Schließen">
+          ✕
+        </button>
+      </div>
 
-        <div className="help-dialog-body">
-          {/* Left nav */}
-          <nav className="help-nav">
-            <div className="help-search-wrap">
-              <input
-                className="help-search"
-                type="search"
-                placeholder="Hilfe durchsuchen…"
-                value={searchQuery}
-                onChange={handleSearchChange}
-                aria-label="Hilfe durchsuchen"
-                autoFocus
-              />
-            </div>
-            <ul className="help-nav-list" role="menu">
-              {filteredSections.length === 0 ? (
-                <li className="help-nav-empty">Keine Ergebnisse</li>
-              ) : (
-                filteredSections.map((sec) => (
-                  <li key={sec.id} role="menuitem">
-                    <button
-                      className={`help-nav-item${currentSection?.id === sec.id ? ' help-nav-item-active' : ''}`}
-                      onClick={() => handleSectionClick(sec.id)}
-                    >
-                      {sec.title}
-                    </button>
-                  </li>
-                ))
-              )}
-            </ul>
-          </nav>
-
-          {/* Content area */}
-          <article className="help-content">
-            {currentSection ? (
-              <>
-                <h2 className="help-section-title">{currentSection.title}</h2>
-                {currentSection.content.map((line, i) => (
-                  <p key={i} className="help-paragraph">
-                    {highlight(line)}
-                  </p>
-                ))}
-                {currentSection.subsections?.map((sub) => (
-                  <div key={sub.title} className="help-subsection">
-                    <h3 className="help-subsection-title">{highlight(sub.title)}</h3>
-                    {sub.content.map((line, i) => (
-                      <p key={i} className="help-paragraph">
-                        {highlight(line)}
-                      </p>
-                    ))}
-                  </div>
-                ))}
-              </>
+      <div className="help-dialog-body">
+        {/* Left nav */}
+        <nav className="help-nav">
+          <div className="help-search-wrap">
+            <input
+              className="help-search"
+              type="search"
+              placeholder="Hilfe durchsuchen…"
+              value={searchQuery}
+              onChange={handleSearchChange}
+              aria-label="Hilfe durchsuchen"
+              autoFocus
+            />
+          </div>
+          <ul className="help-nav-list" role="menu">
+            {filteredSections.length === 0 ? (
+              <li className="help-nav-empty">Keine Ergebnisse</li>
             ) : (
-              <p className="help-paragraph">Keine Ergebnisse für „{searchQuery}".</p>
+              filteredSections.map((sec) => (
+                <li key={sec.id} role="menuitem">
+                  <button
+                    className={`help-nav-item${currentSection?.id === sec.id ? ' help-nav-item-active' : ''}`}
+                    onClick={() => handleSectionClick(sec.id)}
+                  >
+                    {sec.title}
+                  </button>
+                </li>
+              ))
             )}
-          </article>
-        </div>
+          </ul>
+        </nav>
+
+        {/* Content area */}
+        <article className="help-content">
+          {currentSection ? (
+            <>
+              <h2 className="help-section-title">{currentSection.title}</h2>
+              {currentSection.content.map((line, i) => (
+                <p key={i} className="help-paragraph">
+                  {highlight(line)}
+                </p>
+              ))}
+              {currentSection.subsections?.map((sub) => (
+                <div key={sub.title} className="help-subsection">
+                  <h3 className="help-subsection-title">{highlight(sub.title)}</h3>
+                  {sub.content.map((line, i) => (
+                    <p key={i} className="help-paragraph">
+                      {highlight(line)}
+                    </p>
+                  ))}
+                </div>
+              ))}
+            </>
+          ) : (
+            <p className="help-paragraph">Keine Ergebnisse für „{searchQuery}".</p>
+          )}
+        </article>
       </div>
     </div>
   );

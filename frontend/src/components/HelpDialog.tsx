@@ -130,6 +130,17 @@ const HELP_SECTIONS: HelpSection[] = [
         ],
       },
       {
+        title: 'Konstante Werte zuweisen',
+        content: [
+          'Um einem Zielfeld immer denselben festen Wert zuzuweisen (unabhängig vom Quellinhalt), verwenden Sie den Typ template – aber ohne den Platzhalter {{value}}:',
+          '• Typ: template',
+          '• Quellpfad: beliebig (z. B. das erste verfügbare Quellfeld)',
+          '• Template: einfach den gewünschten Konstantwert eintragen, z. B. „EUR" oder „AKTIV"',
+          'Da kein {{value}}-Platzhalter vorhanden ist, wird der Template-Text direkt als Wert übernommen – der Quellwert wird ignoriert.',
+          'Alternativ kann auch der Typ groovy mit einem Literal-Ausdruck verwendet werden, z. B.: return "EUR"',
+        ],
+      },
+      {
         title: 'Regeln bearbeiten',
         content: [
           'Klicken Sie auf „✏️ Bearbeiten" in einer Regelzeile, um die Felder zu ändern.',
@@ -255,6 +266,16 @@ const HELP_SECTIONS: HelpSection[] = [
           'Typ: groovy',
           'Ausdruck: source.date?.replaceAll("-", "")',
           'Ergebnis: Das Datum „2024-03-15" wird zu „20240315" (SAP-IDoc-Format) umgewandelt.',
+        ],
+      },
+      {
+        title: 'Beispiel 5: Konstanten Wert zuweisen',
+        content: [
+          'Quellfeld: (beliebig, z. B. order.id)',
+          'Zielfeld: invoice.currency',
+          'Typ: template',
+          'Template: EUR',
+          'Ergebnis: Das Zielfeld invoice.currency erhält immer den festen Wert „EUR", unabhängig vom Quellinhalt.',
         ],
       },
     ],

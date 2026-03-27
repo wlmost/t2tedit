@@ -111,7 +111,7 @@ func (e *Engine) ValidateMapping(mapping *models.Mapping) *models.ValidationResu
 			prefix = fmt.Sprintf("rule %q", rule.ID)
 		}
 
-		if rule.SourcePath == "" {
+		if rule.SourcePath == "" && rule.Transform != "groovy" && rule.Transform != "template" {
 			result.Errors = append(result.Errors, fmt.Sprintf("%s: sourcePath must not be empty", prefix))
 			result.Valid = false
 		}

@@ -219,6 +219,80 @@ func TestValidateMapping_GroovyMissingScript(t *testing.T) {
 	}
 }
 
+func TestValidateMapping_EmptySourcePathAllowedForTemplateAndGroovy(t *testing.T) {
+	engine := transform.NewEngine()
+	mapping := &models.Mapping{
+		Name: "Constant Value Mapping",
+		Rules: []models.MappingRule{
+			{ID: "r1", SourcePath: "", TargetPath: "out.constant", Transform: "template", Template: "CONSTANT_VALUE"},
+			{ID: "r2", SourcePath: "", TargetPath: "out.computed", Transform: "groovy", GroovyScript: "return 42"},
+		},
+	}
+
+	result := engine.ValidateMapping(mapping)
+
+	if !result.Valid {
+		t.Errorf("expected valid mapping for template/groovy rules without sourcePath, got errors: %v", result.Errors)
+	}
+}
+
+func TestValidateMapping_EmptySourcePathNotAllowedForDirect(t *testing.T) {
+	engine := transform.NewEngine()
+	mapping := &models.Mapping{
+		Name: "Direct Without Source",
+		Rules: []models.MappingRule{
+			{ID: "r1", SourcePath: "", TargetPath: "out", Transform: "direct"},
+		},
+	}
+
+	result := engine.ValidateMapping(mapping)
+
+	if result.Valid {
+		t.Error("expected invalid mapping when sourcePath is empty for direct transform")
+	}
+	found := false
+	for _, e := range result.Errors {
+		if e == `rule "r1": sourcePath must not be empty` {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected sourcePath error for direct rule, got: %v", result.Errors)
+	}
+}
+
+func TestTransform_ConstantTemplateRule(t *testing.T) {
+	engine := transform.NewEngine()
+	mapping := &models.Mapping{
+		ID:   "test-const",
+		Name: "Constant Template",
+		Rules: []models.MappingRule{
+			{
+				ID:         "r1",
+				SourcePath: "",
+				TargetPath: "status",
+				Transform:  "template",
+				Template:   "ACTIVE",
+			},
+		},
+	}
+	input := map[string]interface{}{}
+
+	result := engine.Transform(mapping, input)
+
+	if !result.Success {
+		t.Fatalf("expected success, got error: %s", result.Error)
+	}
+	output, ok := result.OutputData.(map[string]interface{})
+	if !ok {
+		t.Fatal("expected output to be a map")
+	}
+	if output["status"] != "ACTIVE" {
+		t.Errorf("expected status=ACTIVE, got %v", output["status"])
+	}
+}
+
 func TestValidateMapping_NoName(t *testing.T) {
 	engine := transform.NewEngine()
 	mapping := &models.Mapping{

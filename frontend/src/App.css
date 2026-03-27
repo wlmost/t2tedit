@@ -838,37 +838,6 @@ body {
   box-shadow: 0 0 0 2px rgba(59,130,246,0.25);
 }
 
-.groovy-template-panel {
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  border-top: 2px solid var(--color-border);
-  max-height: 40%;
-  overflow: hidden;
-}
-
-.groovy-template-header {
-  display: flex;
-  align-items: center;
-  padding: 6px 0 4px 0;
-  flex-shrink: 0;
-}
-
-.groovy-template-preview {
-  flex: 1;
-  overflow: auto;
-  padding: 10px 12px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  background: #252d3d;
-  color: #93c5fd;
-  font-family: 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
-  font-size: 12px;
-  line-height: 1.6;
-  white-space: pre;
-  margin: 0;
-}
-
 .script-output {
   flex: 1;
   border: 1px solid var(--color-border);

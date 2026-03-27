@@ -378,19 +378,11 @@ export function MappingEditor({ mapping, onSave }: MappingEditorProps) {
               value={groovyScript}
               onChange={(e) => setGroovyScript(e.target.value)}
               spellCheck={false}
-              placeholder={`// Write a Groovy script that transforms source into the target format.\n// The 'source' binding contains the full source JSON.\n// Segments are accessed with quoted keys, e.g. source.'660'.fieldName\n// Use the target{} builder DSL for ySE-compatible output (no array literals).\n\nreturn target {\n  targetField(source.'660'.sourceField)\n}`}
+              placeholder={
+                (draft.targetSchema && targetSchemaToGroovyTemplate(draft.targetSchema)) ||
+                `// Write a Groovy script that transforms source into the target format.\n// The 'source' binding contains the full source JSON.\n// Segments are accessed with quoted keys, e.g. source.'660'.fieldName\n// Use the target{} builder DSL for ySE-compatible output (no array literals).\n\nreturn target {\n  targetField(source.'660'.sourceField)\n}`
+              }
             />
-            {draft.targetSchema && (() => {
-              const tpl = targetSchemaToGroovyTemplate(draft.targetSchema);
-              return tpl ? (
-                <div className="groovy-template-panel">
-                  <div className="groovy-template-header">
-                    <span className="panel-title">Target JSON Structure (Groovy DSL)</span>
-                  </div>
-                  <pre className="groovy-template-preview">{tpl}</pre>
-                </div>
-              ) : null;
-            })()}
           </div>
 
           {/* RIGHT: input structure (top) + output (bottom) */}

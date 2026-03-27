@@ -125,47 +125,48 @@ export const IDOC_DC40_TARGET = {
     ARCKEY: '', // Schlüssel des externen Nachrichtenarchivs
     SERIAL: '', // Serialisierung
   },
-  // Standard SAP character positions (1-indexed) for the EDI_DC40 control record.
-  // Ranges are non-overlapping and contiguous per the SAP IDoc standard.
-  // Total fixed-width line length: 352 characters (end of SERIAL field).
+  // Standard SAP character positions (1-indexed) for the EDI_DC40 control record,
+  // derived from the SAP EDIDC table structure (ABAP dictionary).
+  // Ranges are non-overlapping and contiguous.
+  // Total fixed-width line length: 652 characters (end of SERIAL field).
   _positions: {
     EDI_DC40: {
-      TABNAM: [1, 10] as [number, number],
-      MANDT:  [11, 13] as [number, number],
-      DOCNUM: [14, 29] as [number, number],
-      DOCREL: [30, 34] as [number, number],
-      STATUS: [35, 36] as [number, number],
-      DIRECT: [37, 37] as [number, number],
-      OUTMOD: [38, 38] as [number, number],
-      EXPRSS: [39, 39] as [number, number],
-      TEST:   [40, 40] as [number, number],
-      IDOCTYP:[41, 50] as [number, number],
-      CIMTYP: [51, 58] as [number, number],
-      MESTYP: [59, 66] as [number, number],
-      MESCOD: [67, 69] as [number, number],
-      MESFCT: [70, 71] as [number, number],
-      STD:    [72, 73] as [number, number],
-      STDVRS: [74, 79] as [number, number],
-      STDMES: [80, 86] as [number, number],
-      SNDPOR: [87, 96] as [number, number],
-      SNDPRT: [97, 98] as [number, number],
-      SNDPFC: [99, 100] as [number, number],
-      SNDPRN: [101, 110] as [number, number],
-      SNDSAD: [111, 131] as [number, number],
-      SNDLAD: [132, 161] as [number, number],
-      RCVPOR: [162, 171] as [number, number],
-      RCVPRT: [172, 173] as [number, number],
-      RCVPFC: [174, 175] as [number, number],
-      RCVPRN: [176, 185] as [number, number],
-      RCVSAD: [186, 206] as [number, number],
-      RCVLAD: [207, 236] as [number, number],
-      CREDAT: [237, 244] as [number, number],
-      CRETIM: [245, 250] as [number, number],
-      REFINT: [251, 264] as [number, number],
-      REFGRP: [265, 278] as [number, number],
-      REFMES: [279, 292] as [number, number],
-      ARCKEY: [293, 342] as [number, number],
-      SERIAL: [343, 352] as [number, number],
+      TABNAM: [1,   10]  as [number, number], // CHAR 10
+      MANDT:  [11,  13]  as [number, number], // CLNT  3
+      DOCNUM: [14,  29]  as [number, number], // NUMC 16
+      DOCREL: [30,  34]  as [number, number], // CHAR  5
+      STATUS: [35,  36]  as [number, number], // CHAR  2
+      DIRECT: [37,  37]  as [number, number], // CHAR  1
+      OUTMOD: [38,  38]  as [number, number], // CHAR  1
+      EXPRSS: [39,  39]  as [number, number], // CHAR  1
+      TEST:   [40,  40]  as [number, number], // CHAR  1
+      IDOCTYP:[41,  70]  as [number, number], // CHAR 30
+      CIMTYP: [71,  100] as [number, number], // CHAR 30
+      MESTYP: [101, 130] as [number, number], // CHAR 30
+      MESCOD: [131, 133] as [number, number], // CHAR  3
+      MESFCT: [134, 135] as [number, number], // CHAR  2
+      STD:    [136, 138] as [number, number], // CHAR  3
+      STDVRS: [139, 144] as [number, number], // CHAR  6
+      STDMES: [145, 174] as [number, number], // CHAR 30
+      SNDPOR: [175, 184] as [number, number], // CHAR 10
+      SNDPRT: [185, 186] as [number, number], // CHAR  2
+      SNDPFC: [187, 188] as [number, number], // CHAR  2
+      SNDPRN: [189, 198] as [number, number], // CHAR 10
+      SNDSAD: [199, 219] as [number, number], // CHAR 21
+      SNDLAD: [220, 289] as [number, number], // CHAR 70
+      RCVPOR: [290, 299] as [number, number], // CHAR 10
+      RCVPRT: [300, 301] as [number, number], // CHAR  2
+      RCVPFC: [302, 303] as [number, number], // CHAR  2
+      RCVPRN: [304, 313] as [number, number], // CHAR 10
+      RCVSAD: [314, 334] as [number, number], // CHAR 21
+      RCVLAD: [335, 404] as [number, number], // CHAR 70
+      CREDAT: [405, 412] as [number, number], // DATS  8
+      CRETIM: [413, 418] as [number, number], // TIMS  6
+      REFINT: [419, 466] as [number, number], // CHAR 48
+      REFGRP: [467, 514] as [number, number], // CHAR 48
+      REFMES: [515, 562] as [number, number], // CHAR 48
+      ARCKEY: [563, 632] as [number, number], // CHAR 70
+      SERIAL: [633, 652] as [number, number], // CHAR 20
     },
   },
 };

@@ -405,7 +405,8 @@ function xsdPrimitiveDefault(typeName: string): unknown {
 //
 // 2. BEGIN_SEGMENT_SECTION  — defines the actual business segment structures:
 //    - BEGIN_IDOC <name>     → IDOC type wrapper (skipped)
-//    - BEGIN_GROUP <n>       → group wrapper, may be nested (skipped)
+//    - BEGIN_GROUP <n>       → group wrapper, may be nested; produces a "SG <n>"
+//                              key in the schema that contains its segments
 //    - BEGIN_SEGMENT <type>  → followed by SEGMENTTYPE <name> → stored under <name>
 //      BEGIN_FIELDS
 //        NAME                VBELN
@@ -422,6 +423,11 @@ function xsdPrimitiveDefault(typeName: string): unknown {
 // segment name (SEGNAM) at characters 1–30.  This position is injected into
 // each non-EDI_DC40 segment's positions map automatically so that
 // convertIdocDataWithPositions() can identify which segment each line belongs to.
+//
+// The nested group structure (BEGIN_GROUP/END_GROUP) is preserved in the schema
+// output so that the schema tree reflects the IDoc hierarchy.  A flat version of
+// the schema (segments only, groups stripped) is stored in `_flatSegments` for
+// internal use by data-conversion routines.
 // ---------------------------------------------------------------------------
 
 function isSAPIdocParser(content: string): boolean {
@@ -434,7 +440,7 @@ function isSAPIdocParser(content: string): boolean {
 }
 
 function convertSAPIdocParser(content: string): ConversionResult {
-  // schema:    segmentName → { fieldName → defaultValue }
+  // schema:    segmentName → { fieldName → defaultValue }  (always flat, for positions)
   // positions: segmentName → { fieldName → [charFirst, charLast] }  (1-indexed)
   const schema: Record<string, Record<string, unknown>> = {};
   const positions: Record<string, Record<string, [number, number]>> = {};
@@ -446,6 +452,24 @@ function convertSAPIdocParser(content: string): ConversionResult {
   let collectSchema = true;
   let inFields = false;
   let currentFieldAttrs: Record<string, string> = {};
+
+  // ── Nested group tracking ──────────────────────────────────────────────────
+  // topLevel holds the output schema at the root level.
+  // groupStack is a stack of container objects; the top of the stack is the
+  // object that new segments/groups should be added to.
+  const topLevel: Record<string, unknown> = {};
+  const groupStack: Array<Record<string, unknown>> = [];
+
+  function currentContainer(): Record<string, unknown> {
+    return groupStack.length > 0 ? groupStack[groupStack.length - 1] : topLevel;
+  }
+
+  // Place a completed segment into the current container (group or top level).
+  function placeSegment(segName: string): void {
+    if (schema[segName]) {
+      currentContainer()[segName] = schema[segName];
+    }
+  }
 
   const flushField = () => {
     if (!currentFieldAttrs.NAME || !currentRecord || !collectSchema) {
@@ -489,9 +513,30 @@ function convertSAPIdocParser(content: string): ConversionResult {
     if (line === 'BEGIN_RECORD_SECTION' || line === 'END_RECORD_SECTION') continue;
     if (line === 'BEGIN_SEGMENT_SECTION' || line === 'END_SEGMENT_SECTION') continue;
 
-    // ── Wrappers within BEGIN_SEGMENT_SECTION (skip; segments are parsed directly) ──
+    // ── Wrappers within BEGIN_SEGMENT_SECTION ─────────────────────────────
     if (/^BEGIN_IDOC\b/.test(line) || line === 'END_IDOC') continue;
-    if (/^BEGIN_GROUP\b/.test(line) || /^END_GROUP\b/.test(line)) continue;
+
+    // BEGIN_GROUP <n> — push a new nested container into the current container
+    if (/^BEGIN_GROUP\b/.test(line)) {
+      const numMatch = line.match(/^BEGIN_GROUP\s+(\S+)/);
+      const groupId = numMatch ? numMatch[1] : String(groupStack.length + 1);
+      const groupName = `SG ${groupId}`;
+      const newContainer: Record<string, unknown> = {};
+      // Handle duplicate group keys at the same level by appending a counter
+      let key = groupName;
+      let counter = 2;
+      while (key in currentContainer()) {
+        key = `${groupName}_${counter++}`;
+      }
+      currentContainer()[key] = newContainer;
+      groupStack.push(newContainer);
+      continue;
+    }
+    // END_GROUP — pop back to the parent container
+    if (/^END_GROUP\b/.test(line)) {
+      if (groupStack.length > 0) groupStack.pop();
+      continue;
+    }
 
     // ── Control record → EDI_DC40 ──────────────────────────────────────────
     if (line === 'BEGIN_CONTROL_RECORD') {
@@ -502,7 +547,9 @@ function convertSAPIdocParser(content: string): ConversionResult {
     }
     if (line.startsWith('END_CONTROL_RECORD')) {
       if (inFields) flushField();
+      const segName = currentRecord;
       resetState();
+      if (segName) placeSegment(segName);
       continue;
     }
 
@@ -524,7 +571,10 @@ function convertSAPIdocParser(content: string): ConversionResult {
     }
     if (line.startsWith('END_DATA_RECORD')) {
       if (inFields) flushField();
+      const segName = currentRecord;
+      const wasCollecting = collectSchema;
       resetState();
+      if (segName && wasCollecting) placeSegment(segName);
       continue;
     }
 
@@ -551,7 +601,9 @@ function convertSAPIdocParser(content: string): ConversionResult {
     }
     if (/^END_SEGMENT\b/.test(line)) {
       if (inFields) flushField();
+      const segName = currentRecord;
       resetState();
+      if (segName) placeSegment(segName);
       continue;
     }
 
@@ -613,16 +665,43 @@ function convertSAPIdocParser(content: string): ConversionResult {
     }
   }
 
-  // Build the result object; attach positions as a meta-key for data conversion
-  const result: Record<string, unknown> = {};
-  for (const [name, fields] of Object.entries(schema)) {
-    result[name] = fields;
-  }
+  // Build the result object from the nested topLevel structure.
+  // Attach positions as a meta-key for data conversion (always flat).
+  const result: Record<string, unknown> = { ...topLevel };
   if (Object.keys(positions).length > 0) {
     result['_positions'] = positions;
   }
 
   return { ok: true, json: result, format: 'SAP IDoc' };
+}
+
+/**
+ * Recursively flattens a nested IDoc schema (with "SG <n>" group wrappers)
+ * into a flat segment-name → fields map.
+ *
+ * A "segment" entry has primitive (non-object) field values.
+ * A "group" entry has object values and carries its children recursively.
+ * Meta-keys prefixed with "_" are skipped.
+ */
+function flattenIdocSchema(
+  obj: Record<string, unknown>,
+): Record<string, Record<string, unknown>> {
+  const result: Record<string, Record<string, unknown>> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (key.startsWith('_')) continue;
+    if (value === null || typeof value !== 'object' || Array.isArray(value)) continue;
+    const child = value as Record<string, unknown>;
+    // Determine whether this is a segment (all values primitive) or a group (any value is an object)
+    const isGroup = Object.values(child).some(
+      (v) => v !== null && typeof v === 'object' && !Array.isArray(v),
+    );
+    if (isGroup) {
+      Object.assign(result, flattenIdocSchema(child));
+    } else {
+      result[key] = child;
+    }
+  }
+  return result;
 }
 
 /** Default value for an SAP IDoc field based on its TYPE attribute. */
@@ -889,7 +968,12 @@ function convertDataWithSchema(content: string, schema: unknown): ConversionResu
   // 1. IDoc fixed-length format — try positional extraction first
   if ('_positions' in schemaObj) {
     const positions = schemaObj['_positions'] as Record<string, Record<string, [number, number]>>;
-    const idocResult = convertIdocDataWithPositions(content, filteredSchema, positions);
+    // Flatten the schema in case it has a nested group structure (SG <n> keys)
+    // produced by convertSAPIdocParser.  convertIdocDataWithPositions needs a
+    // flat segment-name → fields map for its segment lookups.
+    const flatSchema = flattenIdocSchema(filteredSchema);
+    const schemaForPositions = Object.keys(flatSchema).length > 0 ? flatSchema : filteredSchema;
+    const idocResult = convertIdocDataWithPositions(content, schemaForPositions, positions);
     if (idocResult.ok) return idocResult;
     // Fall through on failure (data may be delimited instead of fixed-length)
   }

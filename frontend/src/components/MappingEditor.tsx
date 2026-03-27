@@ -5,6 +5,7 @@ import { JsonEditor } from './JsonEditor';
 import { SchemaTree } from './SchemaTree';
 import { RuleRow } from './RuleRow';
 import { mappingToGroovyFile, downloadTextFile, mappingFilename } from '../mappingFile';
+import { jsonResultToIdocText } from '../idocFormatter';
 
 type Tab = 'script' | 'mapping' | 'rules' | 'preview';
 
@@ -353,7 +354,7 @@ export function MappingEditor({ mapping, onSave }: MappingEditorProps) {
               {scriptResult ? (
                 scriptResult.success ? (
                   <pre className="script-output">
-                    {JSON.stringify(scriptResult.result, null, 2)}
+                    {jsonResultToIdocText(scriptResult.result, draft.targetSchema)}
                   </pre>
                 ) : (
                   <div className="script-error-box">

@@ -189,6 +189,17 @@ export function MappingEditor({ mapping, onSave }: MappingEditorProps) {
     setDraft((d) => ({ ...d, rules: [...d.rules, rule] }));
   }
 
+  function addRuleWithTargetOnly(tgt: SchemaField) {
+    const rule: MappingRule = {
+      id: generateId(),
+      sourcePath: '',
+      targetPath: tgt.path,
+      transform: 'template',
+      template: '',
+    };
+    setDraft((d) => ({ ...d, rules: [...d.rules, rule] }));
+  }
+
   function addBlankRule() {
     const rule: MappingRule = {
       id: generateId(),
@@ -401,7 +412,18 @@ export function MappingEditor({ mapping, onSave }: MappingEditorProps) {
               <div className="rule-hint">✔ Source: <code>{selectedSource.path}</code> — now click a target field</div>
             )}
             {!selectedSource && selectedTarget && (
-              <div className="rule-hint">✔ Target: <code>{selectedTarget.path}</code> — now click a source field</div>
+              <div className="rule-hint">
+                ✔ Target: <code>{selectedTarget.path}</code> — click a source field, or{' '}
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => {
+                    addRuleWithTargetOnly(selectedTarget);
+                    setSelectedTarget(null);
+                  }}
+                >
+                  add constant rule (no source)
+                </button>
+              </div>
             )}
             <button className="btn btn-primary btn-sm" onClick={addBlankRule}>+ Add Rule</button>
             {draft.rules.length === 0 ? (

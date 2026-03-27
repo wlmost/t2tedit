@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import type { Mapping } from '../types';
-import { convertSchemaFile } from '../schemaConverter';
+import { convertSchemaFile, convertDataFile } from '../schemaConverter';
 
 interface NewMappingDialogProps {
   onClose: () => void;
@@ -12,8 +12,8 @@ type FieldError = { source?: string; target?: string; example?: string };
 /** All schema file types we accept in the "Load Schema File" pickers. */
 const SCHEMA_FILE_ACCEPT = '.json,.xsd,.csv,.p,.par,.txt,application/json,text/xml,application/xml,text/csv,text/plain';
 
-/** All data file types for the example data picker (JSON only). */
-const DATA_FILE_ACCEPT = '.json,application/json';
+/** All data file types for the example data picker. */
+const DATA_FILE_ACCEPT = '.json,.xml,.csv,.p,.par,.txt,application/json,text/xml,application/xml,text/csv,text/plain';
 
 function readFileAsText(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -22,6 +22,17 @@ function readFileAsText(file: File): Promise<string> {
     reader.onerror = () => reject(new Error('Failed to read file'));
     reader.readAsText(file);
   });
+}
+
+/** Loads a data file, auto-converts from XML / CSV / SAP / JSON to JSON, and
+ *  returns the pretty-printed JSON string or throws an error string.
+ *  An optional `schema` (already-parsed source schema JSON) guides field-name
+ *  resolution for non-self-describing formats. */
+async function loadDataFile(file: File, schema?: unknown): Promise<{ json: string; format: string }> {
+  const content = await readFileAsText(file);
+  const result = convertDataFile(file.name, content, schema);
+  if (!result.ok) throw new Error(result.error);
+  return { json: JSON.stringify(result.json, null, 2), format: result.format };
 }
 
 /** Loads a schema file, auto-converts from XSD / SAP / CSV to JSON, and
@@ -41,6 +52,7 @@ export function NewMappingDialog({ onClose, onCreate }: NewMappingDialogProps) {
   const [exampleJson, setExampleJson] = useState('');
   const [sourceFormat, setSourceFormat] = useState<string | null>(null);
   const [targetFormat, setTargetFormat] = useState<string | null>(null);
+  const [exampleFormat, setExampleFormat] = useState<string | null>(null);
   const [errors, setErrors] = useState<FieldError>({});
 
   const sourceFileRef = useRef<HTMLInputElement>(null);
@@ -66,15 +78,20 @@ export function NewMappingDialog({ onClose, onCreate }: NewMappingDialogProps) {
   async function handleDataFileLoad(
     file: File,
     setter: (v: string) => void,
+    formatSetter: (f: string | null) => void,
     key: keyof FieldError,
   ) {
     try {
-      const content = await readFileAsText(file);
-      JSON.parse(content); // validate
-      setter(content);
+      // Pass the already-loaded source schema so non-JSON/non-XML formats can
+      // use its field names to map raw data values correctly.
+      let schema: unknown;
+      try { schema = sourceJson.trim() ? JSON.parse(sourceJson) : undefined; } catch { /* ignore */ }
+      const { json, format } = await loadDataFile(file, schema);
+      setter(json);
+      formatSetter(format);
       setErrors((prev) => ({ ...prev, [key]: undefined }));
-    } catch {
-      setErrors((prev) => ({ ...prev, [key]: 'Invalid JSON' }));
+    } catch (err: unknown) {
+      setErrors((prev) => ({ ...prev, [key]: err instanceof Error ? err.message : String(err) }));
     }
   }
 
@@ -227,15 +244,18 @@ export function NewMappingDialog({ onClose, onCreate }: NewMappingDialogProps) {
           {/* Example Source Data */}
           <div className="dialog-field">
             <label className="dialog-label">
-              Example Source Data <span className="dialog-optional">(optional — JSON, pre-fills input panels)</span>
+              Example Source Data <span className="dialog-optional">(optional — JSON, XML, CSV, SAP parser file — auto-converted to JSON)</span>
             </label>
             <div className="dialog-file-row">
               <button
                 className="btn btn-secondary btn-sm"
                 onClick={() => exampleFileRef.current?.click()}
               >
-                📂 Load JSON File
+                📂 Load Data File
               </button>
+              {exampleFormat && (
+                <span className="dialog-format-badge">Detected: {exampleFormat}</span>
+              )}
               <input
                 ref={exampleFileRef}
                 type="file"
@@ -243,7 +263,7 @@ export function NewMappingDialog({ onClose, onCreate }: NewMappingDialogProps) {
                 style={{ display: 'none' }}
                 onChange={(e) => {
                   const f = e.target.files?.[0];
-                  if (f) handleDataFileLoad(f, setExampleJson, 'example');
+                  if (f) handleDataFileLoad(f, setExampleJson, setExampleFormat, 'example');
                   e.target.value = '';
                 }}
               />
@@ -251,7 +271,7 @@ export function NewMappingDialog({ onClose, onCreate }: NewMappingDialogProps) {
             <textarea
               className="dialog-textarea"
               value={exampleJson}
-              onChange={(e) => setExampleJson(e.target.value)}
+              onChange={(e) => { setExampleJson(e.target.value); setExampleFormat(null); }}
               placeholder={'{\n  "field": "value"\n}'}
               rows={4}
               spellCheck={false}

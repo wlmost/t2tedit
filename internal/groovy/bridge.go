@@ -97,9 +97,27 @@ func (g *GroovyBridge) Execute(script string, bindings map[string]interface{}) (
 		sb.WriteString(fmt.Sprintf("def %s = __bindings.%s\n", name, name))
 	}
 
+	// Wrap source in __SegmentSource so that source.forEach('661') { item -> … }
+	// works for ergonomic segment iteration (handles both List and single-item segments).
+	if _, hasSource := bindings["source"]; hasSource {
+		sb.WriteString("if (source instanceof Map) source = new __SegmentSource(source)\n")
+	}
+
 	// target{} builder DSL: provides a ySE-compatible way to define the target structure
 	// without using Groovy array/map literal syntax.
+	// __SegmentSource wraps the source Map and adds forEach(segId, Closure) for segment iteration.
 	sb.WriteString(`
+class __SegmentSource {
+    @Delegate Map __map
+    __SegmentSource(Map m) { __map = m }
+    // Iterate all occurrences of a segment by ID.
+    // Works whether the segment value is a List (multiple) or a Map (single).
+    def forEach(String segId, Closure cl) {
+        def val = __map[segId]
+        if (val instanceof List) val.each { cl(it) }
+        else if (val != null) cl(val)
+    }
+}
 class __MapBuilder {
     private def __data = [:]
     def methodMissing(String name, args) {

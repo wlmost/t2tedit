@@ -5,7 +5,7 @@ import { JsonEditor } from './JsonEditor';
 import { SchemaTree } from './SchemaTree';
 import { RuleRow } from './RuleRow';
 import { mappingToGroovyFile, downloadTextFile, mappingFilename } from '../mappingFile';
-import { jsonResultToIdocText } from '../idocFormatter';
+import { formatScriptResult, targetFormatLabel } from '../idocFormatter';
 
 type Tab = 'script' | 'mapping' | 'rules' | 'preview';
 
@@ -400,7 +400,7 @@ export function MappingEditor({ mapping, onSave }: MappingEditorProps) {
 
             <div className="script-right-bottom">
               <div className="script-panel-header">
-                <span className="panel-title">Resulting Target Format (IDoc)</span>
+                <span className="panel-title">Resulting Target Format ({targetFormatLabel(draft.targetSchema)})</span>
                 {scriptResult && (
                   <span className={scriptResult.success ? 'meta-ok' : 'meta-error'}>
                     {scriptResult.success ? `✔ ${scriptResult.durationMs}ms` : `✖ Error`}
@@ -410,7 +410,7 @@ export function MappingEditor({ mapping, onSave }: MappingEditorProps) {
               {scriptResult ? (
                 scriptResult.success ? (
                   <pre className="script-output">
-                    {jsonResultToIdocText(scriptResult.result, draft.targetSchema)}
+                    {formatScriptResult(scriptResult.result, draft.targetSchema)}
                   </pre>
                 ) : (
                   <div className="script-error-box">
@@ -420,7 +420,7 @@ export function MappingEditor({ mapping, onSave }: MappingEditorProps) {
                 )
               ) : (
                 <div className="script-output-placeholder">
-                  Press ▶ Execute to see the transformed IDoc output here.
+                  Press ▶ Execute to see the transformed output here.
                 </div>
               )}
             </div>

@@ -10,10 +10,10 @@ interface NewMappingDialogProps {
 type FieldError = { source?: string; target?: string; example?: string };
 
 /** All schema file types we accept in the "Load Schema File" pickers. */
-const SCHEMA_FILE_ACCEPT = '.json,.xsd,.csv,.p,.par,.txt,application/json,text/xml,application/xml,text/csv,text/plain';
+const SCHEMA_FILE_ACCEPT = '.json,.xsd,.csv,.p,.rep,.par,.txt,application/json,text/xml,application/xml,text/csv,text/plain';
 
 /** All data file types for the example data picker. */
-const DATA_FILE_ACCEPT = '.json,.xml,.csv,.p,.par,.txt,application/json,text/xml,application/xml,text/csv,text/plain';
+const DATA_FILE_ACCEPT = '.idoc,.json,.xml,.csv,.p,.par,.txt,application/json,text/xml,application/xml,text/csv,text/plain';
 
 function readFileAsText(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
